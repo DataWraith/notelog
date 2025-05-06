@@ -95,7 +95,27 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
 
 /// Extract title from note content
 pub fn extract_title(content: &str) -> String {
-    let mut title = content
+    // Skip frontmatter if present
+    let content_without_frontmatter = if has_frontmatter(content) {
+        // Find the end of the frontmatter block
+        let trimmed = content.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("---") {
+            if let Some(end_index) = rest.find("\n---") {
+                // Get content after the frontmatter
+                let after_frontmatter = &rest[end_index + 4..]; // +4 to skip "\n---"
+                after_frontmatter.trim_start()
+            } else {
+                content
+            }
+        } else {
+            content
+        }
+    } else {
+        content
+    };
+
+    // Find the first non-empty line in the content (after frontmatter if present)
+    let mut title = content_without_frontmatter
         .lines()
         .find(|line| !line.trim().is_empty())
         .unwrap_or("")
@@ -199,6 +219,25 @@ pub fn read_file_content(path: &Path) -> Result<String> {
         .map_err(|_| NotelogError::InvalidUtf8Content)
 }
 
+/// Check if content already has YAML frontmatter
+pub fn has_frontmatter(content: &str) -> bool {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return false;
+    }
+
+    // Find the end of the frontmatter block
+    if let Some(rest) = trimmed.strip_prefix("---") {
+        if let Some(end_index) = rest.find("\n---") {
+            // Make sure there's something in the frontmatter block
+            let frontmatter_content = &rest[..end_index];
+            return !frontmatter_content.trim().is_empty();
+        }
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +275,18 @@ mod tests {
         let extracted = extract_title(&content);
         assert_eq!(extracted.len(), 100);
         assert_eq!(extracted, "A".repeat(100));
+    }
+
+    #[test]
+    fn test_extract_title_with_frontmatter() {
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\n# This is a title\nThis is the content";
+        assert_eq!(extract_title(content), "This is a title");
+    }
+
+    #[test]
+    fn test_extract_title_with_frontmatter_no_title() {
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nThis is the content without a title";
+        assert_eq!(extract_title(content), "This is the content without a title");
     }
 
     #[test]
@@ -318,5 +369,28 @@ mod tests {
         assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
         assert!(frontmatter.contains("tags: \n  - tag1\n  - tag2\n  - tag3"));
         assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+    }
+
+    #[test]
+    fn test_has_frontmatter() {
+        // Valid frontmatter
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        assert!(has_frontmatter(content));
+
+        // No frontmatter
+        let content = "# Just a title\nNo frontmatter here";
+        assert!(!has_frontmatter(content));
+
+        // Starts with --- but no closing ---
+        let content = "---\nThis is not valid frontmatter";
+        assert!(!has_frontmatter(content));
+
+        // Empty frontmatter
+        let content = "---\n---\nContent";
+        assert!(!has_frontmatter(content));
+
+        // With whitespace before frontmatter
+        let content = "\n\n  ---\ncreated: 2025-04-01T12:00:00+00:00\n---\nContent";
+        assert!(has_frontmatter(content));
     }
 }
