@@ -51,18 +51,18 @@ pub fn create_date_directories(notes_dir: &Path, date: &DateTime<Local>) -> Resu
     let year = date.year();
     let month = date.month();
     let month_name = match month {
-        1 => "01 January",
-        2 => "02 February",
-        3 => "03 March",
-        4 => "04 April",
-        5 => "05 May",
-        6 => "06 June",
-        7 => "07 July",
-        8 => "08 August",
-        9 => "09 September",
-        10 => "10 October",
-        11 => "11 November",
-        12 => "12 December",
+        1 => "01_January",
+        2 => "02_February",
+        3 => "03_March",
+        4 => "04_April",
+        5 => "05_May",
+        6 => "06_June",
+        7 => "07_July",
+        8 => "08_August",
+        9 => "09_September",
+        10 => "10_October",
+        11 => "11_November",
+        12 => "12_December",
         _ => unreachable!(),
     };
 
