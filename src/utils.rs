@@ -151,6 +151,7 @@ pub fn validate_content(content: &[u8]) -> Result<()> {
 pub fn open_editor(initial_content: Option<&str>) -> Result<String> {
     // Create a temporary file with .md extension
     let mut temp_file = NamedTempFile::with_suffix(".md")?;
+    let temp_path = temp_file.path().to_path_buf();
 
     // Write initial content if provided
     if let Some(content) = initial_content {
@@ -165,7 +166,7 @@ pub fn open_editor(initial_content: Option<&str>) -> Result<String> {
 
     // Launch the editor
     let status = Command::new(&editor)
-        .arg(temp_file.path())
+        .arg(&temp_path)
         .status()
         .map_err(|e| NotelogError::EditorLaunchFailed(format!("{}: {}", editor, e)))?;
 
@@ -175,9 +176,13 @@ pub fn open_editor(initial_content: Option<&str>) -> Result<String> {
         ));
     }
 
-    // Read the content back from the file
+    // Read the content back from the file.
+    // Uses the path directly instead of reopening the temporary file,
+    // because the editor may replace the file instead of modifying it in place
     let mut content = String::new();
-    temp_file.reopen()?.read_to_string(&mut content)?;
+    File::open(&temp_path)?.read_to_string(&mut content)?;
+
+    // The temporary file will be automatically deleted when temp_file goes out of scope
 
     Ok(content)
 }
