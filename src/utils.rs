@@ -1,12 +1,14 @@
 use std::env;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use chrono::{DateTime, Datelike, Local};
 use dirs::home_dir;
+use serde::Deserialize;
 use tempfile::NamedTempFile;
+use yaml_front_matter::YamlFrontMatter;
 
 use crate::error::{NotelogError, Result};
 
@@ -95,8 +97,8 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
 
 /// Extract title from note content
 pub fn extract_title(content: &str) -> String {
-    // Skip frontmatter if present
-    let content_without_frontmatter = if has_frontmatter(content) {
+    // Skip frontmatter if present (both valid and empty frontmatter)
+    let content_without_frontmatter = if has_frontmatter(content) || has_empty_frontmatter(content) {
         // Find the end of the frontmatter block
         let trimmed = content.trim_start();
         if let Some(rest) = trimmed.strip_prefix("---") {
@@ -236,6 +238,76 @@ pub fn has_frontmatter(content: &str) -> bool {
     }
 
     false
+}
+
+/// Check if content has empty frontmatter (---\n---)
+pub fn has_empty_frontmatter(content: &str) -> bool {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return false;
+    }
+
+    // Find the end of the frontmatter block
+    if let Some(rest) = trimmed.strip_prefix("---") {
+        if let Some(end_index) = rest.find("\n---") {
+            // Check if the frontmatter block is empty
+            let frontmatter_content = &rest[..end_index];
+            return frontmatter_content.trim().is_empty();
+        }
+    }
+
+    false
+}
+
+/// Remove empty frontmatter from content
+pub fn remove_empty_frontmatter(content: &str) -> String {
+    if !has_empty_frontmatter(content) {
+        return content.to_string();
+    }
+
+    let trimmed = content.trim_start();
+    if let Some(rest) = trimmed.strip_prefix("---") {
+        if let Some(end_index) = rest.find("\n---") {
+            // Get content after the frontmatter
+            let after_frontmatter = &rest[end_index + 4..]; // +4 to skip "\n---"
+            return after_frontmatter.trim_start().to_string();
+        }
+    }
+
+    content.to_string()
+}
+
+/// Basic frontmatter structure for validation
+#[derive(Deserialize)]
+struct FrontMatter {
+    #[allow(dead_code)]
+    created: String,
+    #[allow(dead_code)]
+    tags: Vec<String>,
+}
+
+/// Validate YAML frontmatter in content
+pub fn validate_frontmatter(content: &str) -> Result<()> {
+    if !has_frontmatter(content) {
+        return Ok(());  // No frontmatter to validate
+    }
+
+    // Try to parse the frontmatter
+    match YamlFrontMatter::parse::<FrontMatter>(content) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(NotelogError::YamlParseError(e.to_string())),
+    }
+}
+
+/// Wait for user to press Enter or Ctrl+C
+pub fn wait_for_user_input() -> Result<bool> {
+    println!("Press Enter to continue or Ctrl+C to exit...");
+
+    let mut input = String::new();
+    match io::stdin().read_line(&mut input) {
+        Ok(_) => Ok(true),  // User pressed Enter
+        Err(e) => Err(NotelogError::Io(e)),  // Error reading input
+    }
 }
 
 #[cfg(test)]
@@ -392,5 +464,71 @@ mod tests {
         // With whitespace before frontmatter
         let content = "\n\n  ---\ncreated: 2025-04-01T12:00:00+00:00\n---\nContent";
         assert!(has_frontmatter(content));
+    }
+
+    #[test]
+    fn test_has_empty_frontmatter() {
+        // Empty frontmatter
+        let content = "---\n---\nContent";
+        assert!(has_empty_frontmatter(content));
+
+        // Empty frontmatter with whitespace
+        let content = "---\n   \n---\nContent";
+        assert!(has_empty_frontmatter(content));
+
+        // Valid frontmatter
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        assert!(!has_empty_frontmatter(content));
+
+        // No frontmatter
+        let content = "# Just a title\nNo frontmatter here";
+        assert!(!has_empty_frontmatter(content));
+    }
+
+    #[test]
+    fn test_remove_empty_frontmatter() {
+        // Empty frontmatter
+        let content = "---\n---\nContent";
+        assert_eq!(remove_empty_frontmatter(content), "Content");
+
+        // Empty frontmatter with whitespace
+        let content = "---\n   \n---\nContent";
+        assert_eq!(remove_empty_frontmatter(content), "Content");
+
+        // Valid frontmatter (should not be removed)
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        assert_eq!(remove_empty_frontmatter(content), content);
+
+        // No frontmatter
+        let content = "# Just a title\nNo frontmatter here";
+        assert_eq!(remove_empty_frontmatter(content), content);
+    }
+
+    #[test]
+    fn test_extract_title_with_empty_frontmatter() {
+        let content = "---\n---\n\n# This is a title\nThis is the content";
+        assert_eq!(extract_title(content), "This is a title");
+
+        let content = "---\n---\nThis is the content without a title";
+        assert_eq!(extract_title(content), "This is the content without a title");
+    }
+
+    #[test]
+    fn test_validate_frontmatter() {
+        // Valid frontmatter
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        assert!(validate_frontmatter(content).is_ok());
+
+        // No frontmatter (should be ok, as we'll add it later)
+        let content = "# Just a title\nNo frontmatter here";
+        assert!(validate_frontmatter(content).is_ok());
+
+        // Invalid YAML in frontmatter
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: invalid yaml\n---\n\nContent";
+        assert!(validate_frontmatter(content).is_err());
+
+        // Missing required field
+        let content = "---\ntags: \n  - tag1\n---\n\nContent";
+        assert!(validate_frontmatter(content).is_err());
     }
 }

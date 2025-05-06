@@ -350,6 +350,7 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
+ "serde",
  "tempfile",
  "thiserror",
  "yaml-front-matter",

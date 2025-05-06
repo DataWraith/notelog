@@ -7,7 +7,8 @@ use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
 use crate::utils::{
     create_date_directories, extract_title, generate_filename, generate_frontmatter,
-    has_frontmatter, open_editor, read_file_content, validate_content,
+    has_empty_frontmatter, has_frontmatter, open_editor, read_file_content, remove_empty_frontmatter,
+    validate_content, validate_frontmatter, wait_for_user_input,
 };
 
 /// Add a new note
@@ -43,10 +44,62 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
         args.args.join(" ")
     } else {
         // Open an editor with frontmatter
-        let now = Local::now();
-        let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
-        let content_with_frontmatter = generate_frontmatter(&base_content, &now);
-        open_editor(Some(&content_with_frontmatter))?
+        let mut content;
+        let mut initial_content: Option<String> = None;
+
+        loop {
+            let now = Local::now();
+
+            // For the first iteration, use the default initial content
+            // For subsequent iterations, use the user's content (even if it has invalid YAML)
+            let editor_content = if let Some(ref user_content) = initial_content {
+                user_content.clone()
+            } else {
+                let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
+                generate_frontmatter(&base_content, &now)
+            };
+
+            content = open_editor(Some(&editor_content))?;
+
+            // Check if the content is completely blank
+            if content.trim().is_empty() {
+                println!("Note is empty. Exiting without saving.");
+                return Ok(());
+            }
+
+            // Check if content has frontmatter
+            if !has_frontmatter(&content) {
+                // No frontmatter or empty frontmatter, we'll add it later
+                break;
+            }
+
+            // Validate the frontmatter
+            match validate_frontmatter(&content) {
+                Ok(_) => break,  // Frontmatter is valid
+                Err(e) => {
+                    eprintln!("Error in YAML frontmatter: {}", e);
+
+                    // Save the user's content for the next iteration
+                    initial_content = Some(content.clone());
+
+                    // Wait for user to press Enter or Ctrl+C
+                    match wait_for_user_input() {
+                        Ok(true) => {
+                            // User pressed Enter, continue the loop to reopen the editor
+                            println!("Reopening editor to fix frontmatter...");
+                            continue;
+                        }
+                        _ => {
+                            // User pressed Ctrl+C or there was an error
+                            println!("Exiting without saving.");
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
+        content
     };
 
     validate_content(content.as_bytes())?;
@@ -71,12 +124,17 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
         counter += 1;
     }
 
-    // Add frontmatter to the content if it doesn't already have it
+    // Add or regenerate frontmatter as needed
     let final_content = if has_frontmatter(&content) {
         // Content already has frontmatter (from editor)
+        // We've already validated it above, so we can use it as is
         content
+    } else if has_empty_frontmatter(&content) {
+        // Empty frontmatter, remove it and add proper frontmatter
+        let content_without_frontmatter = remove_empty_frontmatter(&content);
+        generate_frontmatter(&content_without_frontmatter, &now)
     } else {
-        // Add frontmatter
+        // No frontmatter, add it
         generate_frontmatter(&content, &now)
     };
 
