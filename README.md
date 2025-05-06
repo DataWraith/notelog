@@ -28,7 +28,7 @@ notelog add --title "This is a note" --file /path/to/file
 notelog foo bar baz --title 'Metasyntactic variables'
 
 # Add a note from stdin
-echo "Lorem ipsum" | notelog -d ~/Notes
+echo "Lorem ipsum" | notelog 
 
 # Add a note with a specific notes directory
 notelog -d ~/Notes add -t "Wellerman" There once was a ship
@@ -36,7 +36,7 @@ notelog -d ~/Notes add -t "Wellerman" There once was a ship
 
 ### Notes Directory
 
-By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option.
+By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option or by setting the `NOTELOG_DIR` environment variable.
 
 The notes directory is organized as follows:
 ```
@@ -50,29 +50,3 @@ The notes directory is organized as follows:
 │   └── ...
 └── ...
 ```
-
-### Note Format
-
-Each note is stored as a Markdown file with YAML frontmatter:
-
-```markdown
----
-created: 2025-04-01T12:00:00+02:00
-tags:
-  - tag1
-  - tag2
-  - tag3
----
-
-# The note title
-
-Lorem ipsum dolor sit amet.
-
-```
-
-## Features
-
-- Multiple input methods: command line arguments, file, stdin, or interactive editor
-- Automatic organization of notes by year and month
-- YAML frontmatter with creation timestamp
-- Placeholder for future LLM-based tagging functionality
