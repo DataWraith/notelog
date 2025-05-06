@@ -36,8 +36,8 @@ fn main() -> Result<()> {
         None => {
             // If no subcommand is provided, treat trailing args as 'add' command
             let add_args = AddArgs {
-                title: None,
-                file: None,
+                title: cli.title,
+                file: cli.file,
                 args: cli.args,
             };
             commands::add_note(&notes_dir, add_args, stdin_content)

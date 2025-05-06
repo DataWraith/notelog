@@ -138,15 +138,76 @@ pub fn extract_title(content: &str) -> String {
 }
 
 /// Generate YAML frontmatter for a note
-pub fn generate_frontmatter(content: &str, created: &DateTime<Local>) -> String {
+pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Option<&Vec<String>>) -> String {
     // Format with one-second precision (no fractional seconds)
     let created_iso = created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
 
-    // For now, use placeholder tags
+    // Format tags for YAML
+    let tags_yaml = format_tags_for_frontmatter(tags);
+
     format!(
-        "---\ncreated: {}\ntags: \n  - tag1\n  - tag2\n  - tag3\n---\n\n{}\n\n",
-        created_iso, content
+        "---\ncreated: {}\n{}\n---\n\n{}\n\n",
+        created_iso, tags_yaml, content
     )
+}
+
+/// Format tags for YAML frontmatter
+pub fn format_tags_for_frontmatter(tags: Option<&Vec<String>>) -> String {
+    let default_tags = vec!["log".to_string()];
+    let tags = tags.filter(|t| !t.is_empty()).unwrap_or(&default_tags);
+
+    let mut tags_yaml = String::from("tags:");
+    for tag in tags {
+        tags_yaml.push_str(&format!("\n  - {}", tag));
+    }
+
+    tags_yaml
+}
+
+/// Check if a string is a valid tag
+pub fn validate_tag(tag: &str) -> Result<String> {
+    // Remove the '+' prefix if present
+    let tag = tag.strip_prefix('+').unwrap_or(tag).to_lowercase();
+
+    // Check if tag is empty
+    if tag.is_empty() {
+        return Err(NotelogError::InvalidTag("Tag cannot be empty".to_string()));
+    }
+
+    // Check if tag starts or ends with a dash
+    if tag.starts_with('-') || tag.ends_with('-') {
+        return Err(NotelogError::InvalidTag(
+            format!("Tag '{}' cannot start or end with a dash", tag)
+        ));
+    }
+
+    // Check if tag contains only valid characters (a-z, 0-9, -)
+    if !tag.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        return Err(NotelogError::InvalidTag(
+            format!("Tag '{}' can only contain lowercase letters, numbers, and dashes", tag)
+        ));
+    }
+
+    Ok(tag)
+}
+
+/// Extract tags from command line arguments
+pub fn extract_tags_from_args(args: &[String]) -> Result<(Vec<String>, Vec<String>)> {
+    let mut tags = Vec::new();
+    let mut non_tag_args = Vec::new();
+
+    for arg in args {
+        if arg.starts_with('+') {
+            match validate_tag(arg) {
+                Ok(tag) => tags.push(tag),
+                Err(e) => return Err(e),
+            }
+        } else {
+            non_tag_args.push(arg.clone());
+        }
+    }
+
+    Ok((tags, non_tag_args))
 }
 
 /// Check if content is valid
@@ -351,13 +412,13 @@ mod tests {
 
     #[test]
     fn test_extract_title_with_frontmatter() {
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\n# This is a title\nThis is the content";
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\n# This is a title\nThis is the content";
         assert_eq!(extract_title(content), "This is a title");
     }
 
     #[test]
     fn test_extract_title_with_frontmatter_no_title() {
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nThis is the content without a title";
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nThis is the content without a title";
         assert_eq!(extract_title(content), "This is the content without a title");
     }
 
@@ -434,19 +495,61 @@ mod tests {
     fn test_generate_frontmatter() {
         let content = "# Test Title\nThis is the content";
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
-        let frontmatter = generate_frontmatter(content, &date);
 
-        // Check for the timestamp format with one-second precision
-        // (the timezone part will vary, so we don't check the exact format)
+        // Test with default tags
+        let frontmatter = generate_frontmatter(content, &date, None);
         assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags: \n  - tag1\n  - tag2\n  - tag3"));
+        assert!(frontmatter.contains("tags:\n  - log"));
         assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+
+        // Test with custom tags
+        let tags = vec!["foo".to_string(), "bar".to_string()];
+        let frontmatter = generate_frontmatter(content, &date, Some(&tags));
+        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(frontmatter.contains("tags:\n  - foo\n  - bar"));
+        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+    }
+
+    #[test]
+    fn test_validate_tag() {
+        // Valid tags
+        assert_eq!(validate_tag("+foo").unwrap(), "foo");
+        assert_eq!(validate_tag("+foo-bar").unwrap(), "foo-bar");
+        assert_eq!(validate_tag("+123").unwrap(), "123");
+        assert_eq!(validate_tag("+foo123").unwrap(), "foo123");
+        assert_eq!(validate_tag("+FOO").unwrap(), "foo");
+
+        // Invalid tags
+        assert!(validate_tag("+").is_err());
+        assert!(validate_tag("+-foo").is_err());
+        assert!(validate_tag("+foo-").is_err());
+        assert!(validate_tag("+foo_bar").is_err());
+        assert!(validate_tag("+foo bar").is_err());
+    }
+
+    #[test]
+    fn test_extract_tags_from_args() {
+        // Test with no tags
+        let args = vec!["foo".to_string(), "bar".to_string()];
+        let (tags, non_tags) = extract_tags_from_args(&args).unwrap();
+        assert!(tags.is_empty());
+        assert_eq!(non_tags, args);
+
+        // Test with tags
+        let args = vec!["+foo".to_string(), "bar".to_string(), "+baz".to_string()];
+        let (tags, non_tags) = extract_tags_from_args(&args).unwrap();
+        assert_eq!(tags, vec!["foo", "baz"]);
+        assert_eq!(non_tags, vec!["bar"]);
+
+        // Test with invalid tag
+        let args = vec!["+foo".to_string(), "+foo-".to_string()];
+        assert!(extract_tags_from_args(&args).is_err());
     }
 
     #[test]
     fn test_has_frontmatter() {
         // Valid frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nContent";
         assert!(has_frontmatter(content));
 
         // No frontmatter
@@ -516,7 +619,7 @@ mod tests {
     #[test]
     fn test_validate_frontmatter() {
         // Valid frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nContent";
         assert!(validate_frontmatter(content).is_ok());
 
         // No frontmatter (should be ok, as we'll add it later)
@@ -528,7 +631,7 @@ mod tests {
         assert!(validate_frontmatter(content).is_err());
 
         // Missing required field
-        let content = "---\ntags: \n  - tag1\n---\n\nContent";
+        let content = "---\ntags:\n  - tag1\n---\n\nContent";
         assert!(validate_frontmatter(content).is_err());
     }
 }

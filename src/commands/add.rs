@@ -6,7 +6,7 @@ use chrono::Local;
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
 use crate::utils::{
-    create_date_directories, extract_title, generate_filename, generate_frontmatter,
+    create_date_directories, extract_tags_from_args, extract_title, generate_filename, generate_frontmatter,
     has_empty_frontmatter, has_frontmatter, open_editor, read_file_content, remove_empty_frontmatter,
     validate_content, validate_frontmatter, wait_for_user_input,
 };
@@ -19,10 +19,13 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     // Create the year and month directories
     let month_dir = create_date_directories(notes_dir, &now)?;
 
+    // Extract tags from command line arguments
+    let (tags, non_tag_args) = extract_tags_from_args(&args.args)?;
+
     // Determine the note content
     let content = if !stdin_content.is_empty() {
         // Content from stdin
-        if !args.args.is_empty() {
+        if !non_tag_args.is_empty() {
             return Err(NotelogError::ConflictingStdinAndArgs);
         }
         if args.file.is_some() {
@@ -34,14 +37,14 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
             .map_err(|_| NotelogError::InvalidUtf8Content)?
     } else if let Some(file_path) = &args.file {
         // Content from file
-        if !args.args.is_empty() {
+        if !non_tag_args.is_empty() {
             return Err(NotelogError::ConflictingInputMethods);
         }
 
         read_file_content(file_path)?
-    } else if !args.args.is_empty() {
+    } else if !non_tag_args.is_empty() {
         // Content from command line arguments
-        args.args.join(" ")
+        non_tag_args.join(" ")
     } else {
         // Open an editor with frontmatter
         let mut content;
@@ -56,7 +59,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 user_content.clone()
             } else {
                 let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
-                generate_frontmatter(&base_content, &now)
+                generate_frontmatter(&base_content, &now, Some(&tags))
             };
 
             content = open_editor(Some(&editor_content))?;
@@ -132,10 +135,10 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     } else if has_empty_frontmatter(&content) {
         // Empty frontmatter, remove it and add proper frontmatter
         let content_without_frontmatter = remove_empty_frontmatter(&content);
-        generate_frontmatter(&content_without_frontmatter, &now)
+        generate_frontmatter(&content_without_frontmatter, &now, Some(&tags))
     } else {
         // No frontmatter, add it
-        generate_frontmatter(&content, &now)
+        generate_frontmatter(&content, &now, Some(&tags))
     };
 
     // Write the note to the file

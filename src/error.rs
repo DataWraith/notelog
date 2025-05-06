@@ -35,6 +35,9 @@ pub enum NotelogError {
 
     #[error("Failed to parse YAML front matter: {0}")]
     YamlParseError(String),
+
+    #[error("Invalid tag format: {0}")]
+    InvalidTag(String),
 }
 
 pub type Result<T> = std::result::Result<T, NotelogError>;
