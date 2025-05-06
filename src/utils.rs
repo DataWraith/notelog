@@ -117,7 +117,8 @@ pub fn extract_title(content: &str) -> String {
 
 /// Generate YAML frontmatter for a note
 pub fn generate_frontmatter(content: &str, created: &DateTime<Local>) -> String {
-    let created_iso = created.to_rfc3339();
+    // Format with one-second precision (no fractional seconds)
+    let created_iso = created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
 
     // For now, use placeholder tags
     format!(
@@ -307,6 +308,8 @@ mod tests {
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
         let frontmatter = generate_frontmatter(content, &date);
 
+        // Check for the timestamp format with one-second precision
+        // (the timezone part will vary, so we don't check the exact format)
         assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
         assert!(frontmatter.contains("tags: \n  - tag1\n  - tag2\n  - tag3"));
         assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
