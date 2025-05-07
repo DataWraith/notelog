@@ -1,6 +1,19 @@
 use std::io;
 use thiserror::Error;
 
+/// Specific error type for tag validation errors
+#[derive(Error, Debug)]
+pub enum TagError {
+    #[error("Tag cannot be empty")]
+    Empty,
+
+    #[error("Tag '{0}' cannot start or end with a dash")]
+    InvalidDashPosition(String),
+
+    #[error("Tag '{0}' can only contain lowercase letters, numbers, and dashes")]
+    InvalidCharacters(String),
+}
+
 #[derive(Error, Debug)]
 pub enum NotelogError {
     #[error("IO error: {0}")]
@@ -37,7 +50,11 @@ pub enum NotelogError {
     YamlParseError(String),
 
     #[error("Invalid tag format: {0}")]
+    #[deprecated(note = "Use TagError instead")]
     InvalidTag(String),
+
+    #[error("Tag validation error: {0}")]
+    TagError(#[from] TagError),
 }
 
 pub type Result<T> = std::result::Result<T, NotelogError>;
