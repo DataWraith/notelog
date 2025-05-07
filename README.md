@@ -43,8 +43,8 @@ The notes directory is organized as follows:
 ~/NoteLog/
 ├── 2025/
 │   ├── 01_January/
-│   │   ├── 2025-01-01 First note.md
-│   │   └── 2025-01-02 Second note.md
+│   │   ├── 2025-01-01T17-45 First note.md
+│   │   └── 2025-01-02T12-34 Second note.md
 │   ├── 02_February/
 │   │   └── ...
 │   └── ...
