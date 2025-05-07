@@ -152,8 +152,14 @@ impl TryFrom<String> for Frontmatter {
 /// Generate YAML frontmatter for a note
 pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Option<&Vec<Tag>>) -> String {
     let frontmatter = if let Some(tags) = tags {
-        Frontmatter::new(created.clone(), tags.clone())
+        if tags.is_empty() {
+            // Use default tag if tags vector is empty
+            Frontmatter::new(created.clone(), vec![Tag::new("log").expect("Default tag 'log' should be valid")])
+        } else {
+            Frontmatter::new(created.clone(), tags.clone())
+        }
     } else {
+        // No tags provided, use default tag
         let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
         Frontmatter::new(created.clone(), vec![default_tag])
     };
