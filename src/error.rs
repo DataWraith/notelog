@@ -17,17 +17,11 @@ pub enum TagError {
 /// Specific error type for frontmatter validation errors
 #[derive(Error, Debug)]
 pub enum FrontmatterError {
-    #[error("Missing required field: {0}")]
-    MissingField(String),
-
     #[error("Invalid YAML format: {0}")]
     InvalidYaml(String),
 
     #[error("Invalid timestamp format: {0}")]
     InvalidTimestamp(String),
-
-    #[error("Invalid frontmatter structure: {0}")]
-    InvalidStructure(String),
 }
 
 #[derive(Error, Debug)]
@@ -61,9 +55,6 @@ pub enum NotelogError {
 
     #[error("Failed to launch editor: {0}")]
     EditorLaunchFailed(String),
-
-    #[error("Failed to parse YAML front matter: {0}")]
-    YamlParseError(String),
 
     #[error("Tag validation error: {0}")]
     TagError(#[from] TagError),

@@ -43,11 +43,6 @@ impl Frontmatter {
         &self.tags
     }
 
-    /// Set the tags
-    pub fn set_tags(&mut self, tags: Vec<Tag>) {
-        self.tags = tags;
-    }
-
     /// Format the frontmatter as a YAML string
     pub fn to_yaml(&self) -> String {
         // Format with one-second precision (no fractional seconds)
@@ -164,20 +159,6 @@ pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Opti
     };
 
     frontmatter.apply_to_content(content)
-}
-
-/// Format tags for YAML frontmatter
-pub fn format_tags_for_frontmatter(tags: Option<&Vec<Tag>>) -> String {
-    let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
-    let default_tags = vec![default_tag];
-    let tags = tags.filter(|t| !t.is_empty()).unwrap_or(&default_tags);
-
-    let mut tags_yaml = String::from("tags:");
-    for tag in tags {
-        tags_yaml.push_str(&format!("\n  - {}", tag));
-    }
-
-    tags_yaml
 }
 
 /// Check if content already has YAML frontmatter
