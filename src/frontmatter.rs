@@ -19,37 +19,10 @@ pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Opti
     )
 }
 
-/// Generate YAML frontmatter for a note (legacy version for compatibility)
-pub fn generate_frontmatter_with_string_tags(content: &str, created: &DateTime<Local>, tags: Option<&Vec<String>>) -> String {
-    // Format with one-second precision (no fractional seconds)
-    let created_iso = created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
-
-    // Format tags for YAML
-    let tags_yaml = format_tags_for_frontmatter_with_string_tags(tags);
-
-    format!(
-        "---\ncreated: {}\n{}\n---\n\n{}\n\n",
-        created_iso, tags_yaml, content
-    )
-}
-
 /// Format tags for YAML frontmatter
 pub fn format_tags_for_frontmatter(tags: Option<&Vec<Tag>>) -> String {
     let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
     let default_tags = vec![default_tag];
-    let tags = tags.filter(|t| !t.is_empty()).unwrap_or(&default_tags);
-
-    let mut tags_yaml = String::from("tags:");
-    for tag in tags {
-        tags_yaml.push_str(&format!("\n  - {}", tag));
-    }
-
-    tags_yaml
-}
-
-/// Format tags for YAML frontmatter (legacy version for compatibility)
-pub fn format_tags_for_frontmatter_with_string_tags(tags: Option<&Vec<String>>) -> String {
-    let default_tags = vec!["log".to_string()];
     let tags = tags.filter(|t| !t.is_empty()).unwrap_or(&default_tags);
 
     let mut tags_yaml = String::from("tags:");
@@ -242,25 +215,6 @@ mod tests {
         let tag2 = Tag::new("bar").unwrap();
         let tags = vec![tag1, tag2];
         let frontmatter = generate_frontmatter(content, &date, Some(&tags));
-        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags:\n  - foo\n  - bar"));
-        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
-    }
-
-    #[test]
-    fn test_generate_frontmatter_with_string_tags() {
-        let content = "# Test Title\nThis is the content";
-        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
-
-        // Test with default tags
-        let frontmatter = generate_frontmatter_with_string_tags(content, &date, None);
-        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags:\n  - log"));
-        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
-
-        // Test with custom tags
-        let tags = vec!["foo".to_string(), "bar".to_string()];
-        let frontmatter = generate_frontmatter_with_string_tags(content, &date, Some(&tags));
         assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
         assert!(frontmatter.contains("tags:\n  - foo\n  - bar"));
         assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));

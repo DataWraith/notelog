@@ -33,23 +33,12 @@ impl Tag {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    /// Convert the tag into a String
-    pub fn into_string(self) -> String {
-        self.0
-    }
 }
 
 impl fmt::Display for Tag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
-}
-
-/// Check if a string is a valid tag (legacy function for compatibility)
-pub fn validate_tag(tag: &str) -> Result<String> {
-    let tag = Tag::new(tag)?;
-    Ok(tag.into_string())
 }
 
 /// Extract tags from command line arguments
@@ -96,23 +85,6 @@ mod tests {
     fn test_tag_display() {
         let tag = Tag::new("+foo").unwrap();
         assert_eq!(format!("{}", tag), "foo");
-    }
-
-    #[test]
-    fn test_validate_tag() {
-        // Valid tags
-        assert_eq!(validate_tag("+foo").unwrap(), "foo");
-        assert_eq!(validate_tag("+foo-bar").unwrap(), "foo-bar");
-        assert_eq!(validate_tag("+123").unwrap(), "123");
-        assert_eq!(validate_tag("+foo123").unwrap(), "foo123");
-        assert_eq!(validate_tag("+FOO").unwrap(), "foo");
-
-        // Invalid tags
-        assert!(validate_tag("+").is_err());
-        assert!(validate_tag("+-foo").is_err());
-        assert!(validate_tag("+foo-").is_err());
-        assert!(validate_tag("+foo_bar").is_err());
-        assert!(validate_tag("+foo bar").is_err());
     }
 
     #[test]

@@ -49,10 +49,6 @@ pub enum NotelogError {
     #[error("Failed to parse YAML front matter: {0}")]
     YamlParseError(String),
 
-    #[error("Invalid tag format: {0}")]
-    #[deprecated(note = "Use TagError instead")]
-    InvalidTag(String),
-
     #[error("Tag validation error: {0}")]
     TagError(#[from] TagError),
 }
