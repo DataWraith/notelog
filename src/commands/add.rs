@@ -119,7 +119,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
 
     // Generate the filename
     let mut filename = generate_filename(&now, &title, None);
-    let mut counter = 1;
+    let mut counter = 2;
 
     // Check for filename collisions
     while month_dir.join(&filename).exists() {
