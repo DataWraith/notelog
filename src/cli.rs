@@ -30,6 +30,8 @@ pub struct Cli {
 pub enum Commands {
     /// Add a new note
     Add(AddArgs),
+    /// MCP command (not yet implemented)
+    Mcp(McpArgs),
 }
 
 #[derive(Args)]
@@ -44,5 +46,23 @@ pub struct AddArgs {
 
     /// Note content
     #[arg(trailing_var_arg = true)]
+    pub args: Vec<String>,
+}
+
+/// Arguments for the mcp command
+#[derive(Args)]
+pub struct McpArgs {
+    // We need to capture global options to check if they were provided
+
+    /// Title of the note (should not be used with mcp)
+    #[arg(short = 't', long = "title", hide = true)]
+    pub title: Option<String>,
+
+    /// File to read note content from (should not be used with mcp)
+    #[arg(short = 'f', long = "file", hide = true)]
+    pub file: Option<PathBuf>,
+
+    /// Arguments (should not be used with mcp)
+    #[arg(trailing_var_arg = true, hide = true)]
     pub args: Vec<String>,
 }

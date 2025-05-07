@@ -14,7 +14,15 @@ use cli::{AddArgs, Cli, Commands};
 use error::Result;
 use utils::{ensure_notes_dir_exists, get_notes_dir};
 
-fn main() -> Result<()> {
+fn main() {
+    if let Err(e) = run() {
+        // Print the full error message to stderr
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // Determine the notes directory
@@ -35,6 +43,7 @@ fn main() -> Result<()> {
     // Handle the command (or default to 'add')
     match cli.command {
         Some(Commands::Add(args)) => commands::add_note(&notes_dir, args, stdin_content),
+        Some(Commands::Mcp(args)) => commands::mcp_command(&notes_dir, args),
         None => {
             // If no subcommand is provided, treat trailing args as 'add' command
             let add_args = AddArgs {
