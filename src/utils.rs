@@ -89,7 +89,7 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
 
     // Add counter if provided
     if let Some(counter) = counter {
-        format!("{} ({}) {}.md", date_str, counter, sanitized_title)
+        format!("{} {} ({}).md", date_str, sanitized_title, counter)
     } else {
         format!("{} {}.md", date_str, sanitized_title)
     }
