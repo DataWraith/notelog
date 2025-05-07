@@ -6,7 +6,8 @@ use chrono::Local;
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
 use crate::frontmatter::{
-    generate_frontmatter, has_empty_frontmatter, has_frontmatter, remove_empty_frontmatter, validate_frontmatter,
+    Frontmatter, has_empty_frontmatter, has_frontmatter,
+    remove_empty_frontmatter, validate_frontmatter,
 };
 use crate::tags::extract_tags_from_args;
 use crate::utils::{
@@ -62,7 +63,8 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 user_content.clone()
             } else {
                 let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
-                generate_frontmatter(&base_content, &now, Some(&tags))
+                let frontmatter = Frontmatter::new(now, tags.clone());
+                frontmatter.apply_to_content(&base_content)
             };
 
             content = open_editor(Some(&editor_content))?;
@@ -138,10 +140,12 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     } else if has_empty_frontmatter(&content) {
         // Empty frontmatter, remove it and add proper frontmatter
         let content_without_frontmatter = remove_empty_frontmatter(&content);
-        generate_frontmatter(&content_without_frontmatter, &now, Some(&tags))
+        let frontmatter = Frontmatter::new(now, tags.clone());
+        frontmatter.apply_to_content(&content_without_frontmatter)
     } else {
         // No frontmatter, add it
-        generate_frontmatter(&content, &now, Some(&tags))
+        let frontmatter = Frontmatter::new(now, tags.clone());
+        frontmatter.apply_to_content(&content)
     };
 
     // Write the note to the file

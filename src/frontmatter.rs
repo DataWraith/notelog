@@ -1,22 +1,169 @@
+use std::convert::TryFrom;
+use std::fmt;
 use chrono::{DateTime, Local};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use yaml_front_matter::YamlFrontMatter;
 
-use crate::error::{NotelogError, Result};
+use crate::error::{FrontmatterError, NotelogError, Result};
 use crate::tags::Tag;
+
+/// Represents the frontmatter of a note
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Frontmatter {
+    /// The creation timestamp
+    created: DateTime<Local>,
+    /// The tags associated with the note
+    tags: Vec<Tag>,
+}
+
+impl Frontmatter {
+    /// Create a new frontmatter with the given creation timestamp and tags
+    pub fn new(created: DateTime<Local>, tags: Vec<Tag>) -> Self {
+        Self { created, tags }
+    }
+
+    /// Create a new frontmatter with the current timestamp and given tags
+    pub fn with_tags(tags: Vec<Tag>) -> Self {
+        Self::new(Local::now(), tags)
+    }
+
+    /// Create a new frontmatter with the current timestamp and default tags
+    pub fn default() -> Self {
+        let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
+        Self::with_tags(vec![default_tag])
+    }
+
+    /// Get the creation timestamp
+    pub fn created(&self) -> &DateTime<Local> {
+        &self.created
+    }
+
+    /// Get the tags
+    pub fn tags(&self) -> &[Tag] {
+        &self.tags
+    }
+
+    /// Set the tags
+    pub fn set_tags(&mut self, tags: Vec<Tag>) {
+        self.tags = tags;
+    }
+
+    /// Format the frontmatter as a YAML string
+    pub fn to_yaml(&self) -> String {
+        // Format with one-second precision (no fractional seconds)
+        let created_iso = self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+
+        // Format tags for YAML
+        let mut tags_yaml = String::from("tags:");
+        for tag in &self.tags {
+            tags_yaml.push_str(&format!("\n  - {}", tag));
+        }
+
+        format!("---\ncreated: {}\n{}\n---", created_iso, tags_yaml)
+    }
+
+    /// Apply frontmatter to content
+    pub fn apply_to_content(&self, content: &str) -> String {
+        format!("{}\n\n{}\n\n", self.to_yaml(), content)
+    }
+
+    /// Extract frontmatter from content if present
+    pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
+        if !has_frontmatter(content) {
+            return Ok((None, content.to_string()));
+        }
+
+        // Try to parse the frontmatter
+        let result = YamlFrontMatter::parse::<FrontmatterData>(content);
+        match result {
+            Ok(parsed) => {
+                let frontmatter_data = parsed.metadata;
+                let content = parsed.content.trim_start().to_string();
+
+                // Convert the parsed data to our Frontmatter struct
+                let created = match chrono::DateTime::parse_from_rfc3339(&frontmatter_data.created) {
+                    Ok(dt) => dt.with_timezone(&Local),
+                    Err(e) => return Err(FrontmatterError::InvalidTimestamp(e.to_string()).into()),
+                };
+
+                // Convert string tags to Tag objects
+                let mut tags = Vec::new();
+                for tag_str in &frontmatter_data.tags {
+                    match Tag::new(tag_str) {
+                        Ok(tag) => tags.push(tag),
+                        Err(e) => return Err(e),
+                    }
+                }
+
+                Ok((Some(Self::new(created, tags)), content))
+            },
+            Err(e) => Err(FrontmatterError::InvalidYaml(e.to_string()).into()),
+        }
+    }
+}
+
+impl fmt::Display for Frontmatter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_yaml())
+    }
+}
+
+/// Serializable/deserializable frontmatter data structure
+#[derive(Serialize, Deserialize, Debug)]
+struct FrontmatterData {
+    created: String,
+    tags: Vec<String>,
+}
+
+impl TryFrom<String> for Frontmatter {
+    type Error = NotelogError;
+
+    fn try_from(yaml: String) -> Result<Self> {
+        // Add YAML delimiters if not present
+        let yaml_with_delimiters = if yaml.trim_start().starts_with("---") {
+            yaml
+        } else {
+            format!("---\n{}\n---", yaml)
+        };
+
+        // Try to parse the YAML
+        let result = YamlFrontMatter::parse::<FrontmatterData>(&yaml_with_delimiters);
+        match result {
+            Ok(parsed) => {
+                let frontmatter_data = parsed.metadata;
+
+                // Validate and convert the created timestamp
+                let created = match chrono::DateTime::parse_from_rfc3339(&frontmatter_data.created) {
+                    Ok(dt) => dt.with_timezone(&Local),
+                    Err(e) => return Err(FrontmatterError::InvalidTimestamp(e.to_string()).into()),
+                };
+
+                // Convert string tags to Tag objects
+                let mut tags = Vec::new();
+                for tag_str in &frontmatter_data.tags {
+                    match Tag::new(tag_str) {
+                        Ok(tag) => tags.push(tag),
+                        Err(e) => return Err(e),
+                    }
+                }
+
+                Ok(Self::new(created, tags))
+            },
+            Err(e) => Err(FrontmatterError::InvalidYaml(e.to_string()).into()),
+        }
+    }
+}
 
 /// Generate YAML frontmatter for a note
 pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Option<&Vec<Tag>>) -> String {
-    // Format with one-second precision (no fractional seconds)
-    let created_iso = created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+    let frontmatter = if let Some(tags) = tags {
+        Frontmatter::new(created.clone(), tags.clone())
+    } else {
+        let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
+        Frontmatter::new(created.clone(), vec![default_tag])
+    };
 
-    // Format tags for YAML
-    let tags_yaml = format_tags_for_frontmatter(tags);
-
-    format!(
-        "---\ncreated: {}\n{}\n---\n\n{}\n\n",
-        created_iso, tags_yaml, content
-    )
+    frontmatter.apply_to_content(content)
 }
 
 /// Format tags for YAML frontmatter
@@ -89,25 +236,16 @@ pub fn remove_empty_frontmatter(content: &str) -> String {
     content.to_string()
 }
 
-/// Basic frontmatter structure for validation
-#[derive(Deserialize)]
-struct FrontMatter {
-    #[allow(dead_code)]
-    created: String,
-    #[allow(dead_code)]
-    tags: Vec<String>,
-}
-
 /// Validate YAML frontmatter in content
 pub fn validate_frontmatter(content: &str) -> Result<()> {
     if !has_frontmatter(content) {
         return Ok(());  // No frontmatter to validate
     }
 
-    // Try to parse the frontmatter
-    match YamlFrontMatter::parse::<FrontMatter>(content) {
+    // Try to extract and parse the frontmatter
+    match Frontmatter::extract_from_content(content) {
         Ok(_) => Ok(()),
-        Err(e) => Err(NotelogError::YamlParseError(e.to_string())),
+        Err(e) => Err(e),
     }
 }
 
@@ -157,6 +295,115 @@ pub fn extract_title_from_content_with_frontmatter(content: &str) -> String {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_frontmatter_struct_creation() {
+        // Test creating a new Frontmatter with specific date and tags
+        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
+        let tag1 = Tag::new("foo").unwrap();
+        let tag2 = Tag::new("bar").unwrap();
+        let tags = vec![tag1.clone(), tag2.clone()];
+
+        let frontmatter = Frontmatter::new(date.clone(), tags.clone());
+
+        assert_eq!(frontmatter.created(), &date);
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert_eq!(frontmatter.tags()[0], tag1);
+        assert_eq!(frontmatter.tags()[1], tag2);
+
+        // Test with_tags constructor
+        let frontmatter = Frontmatter::with_tags(tags.clone());
+
+        // We can't directly compare timestamps due to the small time difference
+        // between creation and assertion, so we'll just check the tags
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert_eq!(frontmatter.tags()[0], tag1);
+        assert_eq!(frontmatter.tags()[1], tag2);
+
+        // Test default constructor
+        let frontmatter = Frontmatter::default();
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "log");
+    }
+
+    #[test]
+    fn test_frontmatter_to_yaml() {
+        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
+        let tag1 = Tag::new("foo").unwrap();
+        let tag2 = Tag::new("bar").unwrap();
+        let tags = vec![tag1, tag2];
+
+        let frontmatter = Frontmatter::new(date, tags);
+        let yaml = frontmatter.to_yaml();
+
+        assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(yaml.contains("tags:\n  - foo\n  - bar"));
+        assert!(yaml.ends_with("---"));
+    }
+
+    #[test]
+    fn test_frontmatter_apply_to_content() {
+        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
+        let tag = Tag::new("test").unwrap();
+        let frontmatter = Frontmatter::new(date, vec![tag]);
+
+        let content = "# Test Content\nThis is a test.";
+        let result = frontmatter.apply_to_content(content);
+
+        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(result.contains("tags:\n  - test"));
+        assert!(result.contains("---\n\n# Test Content\nThis is a test.\n\n"));
+    }
+
+    #[test]
+    fn test_frontmatter_extract_from_content() {
+        // Valid frontmatter
+        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test\n---\n\n# Content";
+        let result = Frontmatter::extract_from_content(content).unwrap();
+
+        assert!(result.0.is_some());
+        let frontmatter = result.0.unwrap();
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert_eq!(result.1, "# Content");
+
+        // No frontmatter
+        let content = "# Just content\nNo frontmatter here";
+        let result = Frontmatter::extract_from_content(content).unwrap();
+
+        assert!(result.0.is_none());
+        assert_eq!(result.1, content);
+
+        // Invalid frontmatter
+        let content = "---\ncreated: invalid-date\ntags:\n  - test\n---\n\n# Content";
+        assert!(Frontmatter::extract_from_content(content).is_err());
+    }
+
+    #[test]
+    fn test_frontmatter_try_from_string() {
+        // Valid YAML
+        let yaml = "created: 2025-04-01T12:00:00+00:00\ntags:\n  - test";
+        let frontmatter = Frontmatter::try_from(yaml.to_string()).unwrap();
+
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+
+        // Already has delimiters
+        let yaml = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test\n---";
+        let frontmatter = Frontmatter::try_from(yaml.to_string()).unwrap();
+
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+
+        // Invalid YAML
+        let yaml = "created: invalid-date\ntags:\n  - test";
+        assert!(Frontmatter::try_from(yaml.to_string()).is_err());
+
+        // Missing required field
+        let yaml = "tags:\n  - test";
+        assert!(Frontmatter::try_from(yaml.to_string()).is_err());
+    }
 
     #[test]
     fn test_extract_title_from_content_with_frontmatter() {

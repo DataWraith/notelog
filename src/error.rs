@@ -14,6 +14,22 @@ pub enum TagError {
     InvalidCharacters(String),
 }
 
+/// Specific error type for frontmatter validation errors
+#[derive(Error, Debug)]
+pub enum FrontmatterError {
+    #[error("Missing required field: {0}")]
+    MissingField(String),
+
+    #[error("Invalid YAML format: {0}")]
+    InvalidYaml(String),
+
+    #[error("Invalid timestamp format: {0}")]
+    InvalidTimestamp(String),
+
+    #[error("Invalid frontmatter structure: {0}")]
+    InvalidStructure(String),
+}
+
 #[derive(Error, Debug)]
 pub enum NotelogError {
     #[error("IO error: {0}")]
@@ -51,6 +67,9 @@ pub enum NotelogError {
 
     #[error("Tag validation error: {0}")]
     TagError(#[from] TagError),
+
+    #[error("Frontmatter validation error: {0}")]
+    FrontmatterError(#[from] FrontmatterError),
 }
 
 pub type Result<T> = std::result::Result<T, NotelogError>;
