@@ -59,6 +59,9 @@ pub enum NotelogError {
     #[error("Invalid options for 'mcp' command: only the global --notes-dir option is allowed.")]
     InvalidMcpOptions,
 
+    #[error("MCP server error: {0}")]
+    McpServerError(String),
+
     #[error("Tag validation error: {0}")]
     TagError(#[from] TagError),
 

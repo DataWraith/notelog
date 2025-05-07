@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use crate::error::{NotelogError, Result};
 use crate::core::frontmatter::Frontmatter;
+use crate::error::{NotelogError, Result};
 
 /// Represents a complete note with frontmatter and content
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,7 +17,10 @@ pub struct Note {
 impl Note {
     /// Create a new note with the given frontmatter and content
     pub fn new(frontmatter: Frontmatter, content: String) -> Self {
-        Self { frontmatter, content }
+        Self {
+            frontmatter,
+            content,
+        }
     }
 
     /// Get the frontmatter of the note
@@ -38,7 +41,8 @@ impl Note {
     /// Extract title from the note content
     pub fn extract_title(&self) -> String {
         // Find the first non-empty line in the content
-        let mut title = self.content
+        let mut title = self
+            .content
             .lines()
             .find(|line| !line.trim().is_empty())
             .unwrap_or("")
@@ -71,14 +75,14 @@ impl FromStr for Note {
                     frontmatter,
                     content,
                 })
-            },
+            }
             Ok((None, content)) => {
                 // No frontmatter or empty frontmatter, use default
                 Ok(Self {
                     frontmatter: Frontmatter::default(),
                     content,
                 })
-            },
+            }
             Err(e) => Err(e),
         }
     }

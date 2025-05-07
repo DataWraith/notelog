@@ -5,13 +5,13 @@ use std::str::FromStr;
 use chrono::Local;
 
 use crate::cli::AddArgs;
-use crate::error::{NotelogError, Result};
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
 use crate::core::tags::extract_tags_from_args;
+use crate::error::{NotelogError, Result};
 use crate::utils::{
-    create_date_directories, extract_title, generate_filename, open_editor,
-    read_file_content, validate_content, wait_for_user_input,
+    create_date_directories, extract_title, generate_filename, open_editor, read_file_content,
+    validate_content, wait_for_user_input,
 };
 
 /// Add a new note
@@ -36,8 +36,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
         }
 
         validate_content(&stdin_content)?;
-        String::from_utf8(stdin_content)
-            .map_err(|_| NotelogError::InvalidUtf8Content)?
+        String::from_utf8(stdin_content).map_err(|_| NotelogError::InvalidUtf8Content)?
     } else if let Some(file_path) = &args.file {
         // Content from file
         if !non_tag_args.is_empty() {
@@ -59,7 +58,11 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
             let editor_content = if let Some(ref user_content) = initial_content {
                 user_content.clone()
             } else {
-                let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
+                let base_content = args
+                    .title
+                    .as_ref()
+                    .map(|t| format!("# {}", t))
+                    .unwrap_or_default();
                 // When opening the editor, use default tag if no tags provided
                 // This makes it easier for users to add tags
                 let frontmatter = Frontmatter::default();
@@ -79,7 +82,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 Ok(_) => {
                     // Note is valid (either has valid frontmatter or no frontmatter)
                     break;
-                },
+                }
                 Err(e) => {
                     eprintln!("Error in YAML frontmatter: {}", e);
 
@@ -140,7 +143,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 // Note already has valid frontmatter or no tags specified
                 content
             }
-        },
+        }
         _ => {
             // Invalid frontmatter, add a new one
             let frontmatter = Frontmatter::with_tags(tags.clone());

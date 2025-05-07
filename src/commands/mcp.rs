@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::cli::McpArgs;
 use crate::error::{NotelogError, Result};
+use crate::mcp::{self, Calculator};
 
 /// Handle the mcp command
 pub fn mcp_command(_notes_dir: &Path, args: McpArgs) -> Result<()> {
@@ -10,8 +11,12 @@ pub fn mcp_command(_notes_dir: &Path, args: McpArgs) -> Result<()> {
         return Err(NotelogError::InvalidMcpOptions);
     }
 
-    // Print a warning that the command is not yet implemented
-    println!("Warning: The 'mcp' command is not yet implemented.");
+    // Create a new Calculator handler
+    let handler = Calculator;
 
-    Ok(())
+    // Run the MCP server with the handler
+    match mcp::run_mcp_server(handler) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(NotelogError::McpServerError(e.to_string())),
+    }
 }

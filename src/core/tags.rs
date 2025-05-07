@@ -1,7 +1,7 @@
 //! Tag implementation for notelog
 
-use std::fmt;
 use crate::error::{NotelogError, Result, TagError};
+use std::fmt;
 
 /// An opaque wrapper type that represents a valid tag
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,7 +24,10 @@ impl Tag {
         }
 
         // Check if tag contains only valid characters (a-z, 0-9, -)
-        if !tag.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        if !tag
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
             return Err(NotelogError::TagError(TagError::InvalidCharacters(tag)));
         }
 
@@ -76,11 +79,26 @@ mod tests {
         assert_eq!(Tag::new("+FOO").unwrap().as_str(), "foo");
 
         // Invalid tags
-        assert!(matches!(Tag::new("+").unwrap_err(), NotelogError::TagError(TagError::Empty)));
-        assert!(matches!(Tag::new("+-foo").unwrap_err(), NotelogError::TagError(TagError::InvalidDashPosition(_))));
-        assert!(matches!(Tag::new("+foo-").unwrap_err(), NotelogError::TagError(TagError::InvalidDashPosition(_))));
-        assert!(matches!(Tag::new("+foo_bar").unwrap_err(), NotelogError::TagError(TagError::InvalidCharacters(_))));
-        assert!(matches!(Tag::new("+foo bar").unwrap_err(), NotelogError::TagError(TagError::InvalidCharacters(_))));
+        assert!(matches!(
+            Tag::new("+").unwrap_err(),
+            NotelogError::TagError(TagError::Empty)
+        ));
+        assert!(matches!(
+            Tag::new("+-foo").unwrap_err(),
+            NotelogError::TagError(TagError::InvalidDashPosition(_))
+        ));
+        assert!(matches!(
+            Tag::new("+foo-").unwrap_err(),
+            NotelogError::TagError(TagError::InvalidDashPosition(_))
+        ));
+        assert!(matches!(
+            Tag::new("+foo_bar").unwrap_err(),
+            NotelogError::TagError(TagError::InvalidCharacters(_))
+        ));
+        assert!(matches!(
+            Tag::new("+foo bar").unwrap_err(),
+            NotelogError::TagError(TagError::InvalidCharacters(_))
+        ));
     }
 
     #[test]

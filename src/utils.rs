@@ -15,19 +15,23 @@ pub fn get_notes_dir(notes_dir: Option<PathBuf>) -> Result<PathBuf> {
     notes_dir
         .or_else(|| env::var("NOTELOG_DIR").map(PathBuf::from).ok())
         .or_else(|| home_dir().map(|p| p.join("NoteLog")))
-        .ok_or_else(|| NotelogError::NotesDirectoryNotFound("Could not determine home directory".to_string()))
+        .ok_or_else(|| {
+            NotelogError::NotesDirectoryNotFound("Could not determine home directory".to_string())
+        })
 }
 
 /// Ensure the notes directory exists and is writable
 pub fn ensure_notes_dir_exists(notes_dir: &Path) -> Result<()> {
     if !notes_dir.exists() {
-        return Err(NotelogError::NotesDirectoryNotFound(
-            format!("Directory does not exist: {}", notes_dir.display())
-        ));
+        return Err(NotelogError::NotesDirectoryNotFound(format!(
+            "Directory does not exist: {}",
+            notes_dir.display()
+        )));
     } else if !notes_dir.is_dir() {
-        return Err(NotelogError::NotesDirectoryNotFound(
-            format!("{} is not a directory", notes_dir.display())
-        ));
+        return Err(NotelogError::NotesDirectoryNotFound(format!(
+            "{} is not a directory",
+            notes_dir.display()
+        )));
     }
 
     // Check if the directory is writable by attempting to create a temporary file
@@ -37,10 +41,12 @@ pub fn ensure_notes_dir_exists(notes_dir: &Path) -> Result<()> {
             // Clean up the test file
             let _ = fs::remove_file(temp_file_path);
             Ok(())
-        },
-        Err(e) => Err(NotelogError::NotesDirectoryNotWritable(
-            format!("{}: {}", notes_dir.display(), e)
-        )),
+        }
+        Err(e) => Err(NotelogError::NotesDirectoryNotWritable(format!(
+            "{}: {}",
+            notes_dir.display(),
+            e
+        ))),
     }
 }
 
@@ -142,9 +148,10 @@ pub fn open_editor(initial_content: Option<&str>) -> Result<String> {
         .map_err(|e| NotelogError::EditorLaunchFailed(format!("{}: {}", editor, e)))?;
 
     if !status.success() {
-        return Err(NotelogError::EditorLaunchFailed(
-            format!("{} exited with status {}", editor, status)
-        ));
+        return Err(NotelogError::EditorLaunchFailed(format!(
+            "{} exited with status {}",
+            editor, status
+        )));
     }
 
     // Read the content back from the file.
@@ -166,11 +173,8 @@ pub fn read_file_content(path: &Path) -> Result<String> {
 
     validate_content(&content)?;
 
-    String::from_utf8(content)
-        .map_err(|_| NotelogError::InvalidUtf8Content)
+    String::from_utf8(content).map_err(|_| NotelogError::InvalidUtf8Content)
 }
-
-
 
 /// Wait for user to press Enter or Ctrl+C
 pub fn wait_for_user_input() -> Result<bool> {
@@ -178,21 +182,24 @@ pub fn wait_for_user_input() -> Result<bool> {
 
     let mut input = String::new();
     match io::stdin().read_line(&mut input) {
-        Ok(_) => Ok(true),  // User pressed Enter
-        Err(e) => Err(NotelogError::Io(e)),  // Error reading input
+        Ok(_) => Ok(true),                  // User pressed Enter
+        Err(e) => Err(NotelogError::Io(e)), // Error reading input
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
     use crate::error::NotelogError;
+    use chrono::TimeZone;
 
     #[test]
     fn test_extract_title_delegates_to_frontmatter() {
         let content = "This is a title\nThis is the content";
-        assert_eq!(extract_title(content), crate::core::frontmatter::extract_title_from_content_with_frontmatter(content));
+        assert_eq!(
+            extract_title(content),
+            crate::core::frontmatter::extract_title_from_content_with_frontmatter(content)
+        );
     }
 
     #[test]
@@ -228,22 +235,34 @@ mod tests {
     #[test]
     fn test_validate_content_empty() {
         let content = b"";
-        assert!(matches!(validate_content(content), Err(NotelogError::EmptyContent)));
+        assert!(matches!(
+            validate_content(content),
+            Err(NotelogError::EmptyContent)
+        ));
 
         let content = b"   \n   ";
-        assert!(matches!(validate_content(content), Err(NotelogError::EmptyContent)));
+        assert!(matches!(
+            validate_content(content),
+            Err(NotelogError::EmptyContent)
+        ));
     }
 
     #[test]
     fn test_validate_content_too_large() {
         let content = vec![b'a'; 51 * 1024]; // 51KiB
-        assert!(matches!(validate_content(&content), Err(NotelogError::ContentTooLarge)));
+        assert!(matches!(
+            validate_content(&content),
+            Err(NotelogError::ContentTooLarge)
+        ));
     }
 
     #[test]
     fn test_validate_content_null_bytes() {
         let content = b"Test\0Content";
-        assert!(matches!(validate_content(content), Err(NotelogError::ContentContainsNullBytes)));
+        assert!(matches!(
+            validate_content(content),
+            Err(NotelogError::ContentContainsNullBytes)
+        ));
     }
 
     #[test]
@@ -258,8 +277,7 @@ mod tests {
         let invalid_utf8 = vec![0xFF, 0xFF, 0xFF, 0xFF];
 
         // Test with String::from_utf8 conversion
-        let result = String::from_utf8(invalid_utf8)
-            .map_err(|_| NotelogError::InvalidUtf8Content);
+        let result = String::from_utf8(invalid_utf8).map_err(|_| NotelogError::InvalidUtf8Content);
 
         assert!(matches!(result, Err(NotelogError::InvalidUtf8Content)));
     }

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand, Args};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(author, version, about = "A command-line tool for recording notes")]
@@ -53,7 +53,6 @@ pub struct AddArgs {
 #[derive(Args)]
 pub struct McpArgs {
     // We need to capture global options to check if they were provided
-
     /// Title of the note (should not be used with mcp)
     #[arg(short = 't', long = "title", hide = true)]
     pub title: Option<String>,

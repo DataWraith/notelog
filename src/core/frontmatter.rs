@@ -1,12 +1,12 @@
 //! Frontmatter implementation for notelog
 
-use std::fmt;
-use std::str::FromStr;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
-use crate::error::{FrontmatterError, NotelogError, Result};
 use crate::core::tags::Tag;
+use crate::error::{FrontmatterError, NotelogError, Result};
 
 /// Represents the frontmatter of a note
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,11 +111,11 @@ impl Frontmatter {
                     Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
                     Err(e) => Err(e),
                 }
-            },
+            }
             Ok((None, content_without_frontmatter)) => {
                 // No frontmatter or empty frontmatter
                 Ok((None, content_without_frontmatter))
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -315,19 +315,31 @@ mod tests {
     fn test_extract_title_from_content_with_frontmatter() {
         // Plain text
         let content = "This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         // Markdown
         let content = "# This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         // Multiple hashes
         let content = "### This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         // Empty lines
         let content = "\n\n# This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         // Long title truncation
         let long_title = "A".repeat(150);
@@ -338,17 +350,29 @@ mod tests {
 
         // With frontmatter
         let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\n# This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         // With frontmatter, no title
         let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nThis is the content without a title";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is the content without a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is the content without a title"
+        );
 
         // With empty frontmatter
         let content = "---\n---\n\n# This is a title\nThis is the content";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is a title"
+        );
 
         let content = "---\n---\nThis is the content without a title";
-        assert_eq!(extract_title_from_content_with_frontmatter(content), "This is the content without a title");
+        assert_eq!(
+            extract_title_from_content_with_frontmatter(content),
+            "This is the content without a title"
+        );
     }
 }
