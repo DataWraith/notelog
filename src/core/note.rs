@@ -1,7 +1,9 @@
+//! Note implementation for notelog
+
 use std::str::FromStr;
 
 use crate::error::{NotelogError, Result};
-use crate::frontmatter::Frontmatter;
+use crate::core::frontmatter::Frontmatter;
 
 /// Represents a complete note with frontmatter and content
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,3 +1,5 @@
+//! Tag implementation for notelog
+
 use std::fmt;
 use crate::error::{NotelogError, Result, TagError};
 

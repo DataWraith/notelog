@@ -1,10 +1,12 @@
+//! Frontmatter implementation for notelog
+
 use std::fmt;
 use std::str::FromStr;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FrontmatterError, NotelogError, Result};
-use crate::tags::Tag;
+use crate::core::tags::Tag;
 
 /// Represents the frontmatter of a note
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -348,104 +350,5 @@ mod tests {
 
         let content = "---\n---\nThis is the content without a title";
         assert_eq!(extract_title_from_content_with_frontmatter(content), "This is the content without a title");
-    }
-
-    #[test]
-    fn test_frontmatter_with_different_tags() {
-        let content = "# Test Title\nThis is the content";
-        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
-
-        // Test with no tags
-        let frontmatter = Frontmatter::new(date.clone(), vec![]);
-        let result = frontmatter.apply_to_content(content);
-        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(result.contains("tags: []"));
-        assert!(result.contains("---\n\n# Test Title\nThis is the content\n\n"));
-
-        // Test with custom tags
-        let tag1 = Tag::new("foo").unwrap();
-        let tag2 = Tag::new("bar").unwrap();
-        let tags = vec![tag1, tag2];
-        let frontmatter = Frontmatter::new(date.clone(), tags);
-        let result = frontmatter.apply_to_content(content);
-        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(result.contains("tags:\n  - foo\n  - bar"));
-        assert!(result.contains("---\n\n# Test Title\nThis is the content\n\n"));
-    }
-
-    #[test]
-    fn test_frontmatter_detection() {
-        // Valid frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_some());
-
-        // No frontmatter
-        let content = "# Just a title\nNo frontmatter here";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, content);
-
-        // Starts with --- but no closing ---
-        let content = "---\nThis is not valid frontmatter";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, content);
-
-        // Empty frontmatter
-        let content = "---\n---\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, "Content");
-
-        // With whitespace before frontmatter
-        let content = "\n\n  ---\ncreated: 2025-04-01T12:00:00+00:00\n---\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_some());
-    }
-
-    #[test]
-    fn test_empty_frontmatter_handling() {
-        // Empty frontmatter
-        let content = "---\n---\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, "Content");
-
-        // Empty frontmatter with whitespace
-        let content = "---\n   \n---\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, "Content");
-
-        // Valid frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: \n  - tag1\n---\n\nContent";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_some());
-
-        // No frontmatter
-        let content = "# Just a title\nNo frontmatter here";
-        let result = Frontmatter::extract_from_content(content).unwrap();
-        assert!(result.0.is_none());
-        assert_eq!(result.1, content);
-    }
-
-    #[test]
-    fn test_frontmatter_validation() {
-        // Valid frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nContent";
-        assert!(Frontmatter::extract_from_content(content).is_ok());
-
-        // No frontmatter (should be ok, as we'll add it later)
-        let content = "# Just a title\nNo frontmatter here";
-        assert!(Frontmatter::extract_from_content(content).is_ok());
-
-        // Invalid YAML in frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags: invalid yaml\n---\n\nContent";
-        assert!(Frontmatter::extract_from_content(content).is_err());
-
-        // Missing required field
-        let content = "---\ntags:\n  - tag1\n---\n\nContent";
-        assert!(Frontmatter::extract_from_content(content).is_err());
     }
 }

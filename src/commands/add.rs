@@ -6,9 +6,9 @@ use chrono::Local;
 
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
-use crate::frontmatter::Frontmatter;
-use crate::note::Note;
-use crate::tags::extract_tags_from_args;
+use crate::core::frontmatter::Frontmatter;
+use crate::core::note::Note;
+use crate::core::tags::extract_tags_from_args;
 use crate::utils::{
     create_date_directories, extract_title, generate_filename, open_editor,
     read_file_content, validate_content, wait_for_user_input,

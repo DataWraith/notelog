@@ -1,9 +1,7 @@
 mod cli;
 mod commands;
+mod core;
 mod error;
-mod frontmatter;
-mod note;
-mod tags;
 mod utils;
 
 use std::io::{self, Read};
