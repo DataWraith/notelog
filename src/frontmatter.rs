@@ -66,10 +66,8 @@ impl Frontmatter {
         format!("{}\n\n{}\n\n", self.to_yaml(), content)
     }
 
-    /// Extract frontmatter from content if present
-    pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
-        use yaml_front_matter::YamlFrontMatter;
-
+    /// Helper function to extract YAML frontmatter and content from a document
+    fn extract_yaml_and_content(content: &str) -> Result<(Option<String>, String)> {
         // Check if the content starts with frontmatter
         let trimmed = content.trim_start();
         if !trimmed.starts_with("---") {
@@ -86,33 +84,37 @@ impl Frontmatter {
                     let after_frontmatter = &rest[end_index + 4..]; // +4 to skip "\n---"
                     return Ok((None, after_frontmatter.trim_start().to_string()));
                 }
+
+                // Extract the frontmatter and content
+                let yaml = frontmatter_content.trim().to_string();
+                let after_frontmatter = &rest[end_index + 4..]; // +4 to skip "\n---"
+                return Ok((Some(yaml), after_frontmatter.trim_start().to_string()));
             } else {
                 // No closing delimiter, not valid frontmatter
                 return Ok((None, content.to_string()));
             }
         }
 
-        // Try to parse the frontmatter
-        match YamlFrontMatter::parse::<FrontmatterData>(content) {
-            Ok(document) => {
-                // Convert the parsed data to our Frontmatter struct
-                let created = match chrono::DateTime::parse_from_rfc3339(&document.metadata.created) {
-                    Ok(dt) => dt.with_timezone(&Local),
-                    Err(e) => return Err(FrontmatterError::InvalidTimestamp(e.to_string()).into()),
-                };
+        // Should not reach here, but just in case
+        Ok((None, content.to_string()))
+    }
 
-                // Convert string tags to Tag objects
-                let mut tags = Vec::new();
-                for tag_str in &document.metadata.tags {
-                    match Tag::new(tag_str) {
-                        Ok(tag) => tags.push(tag),
-                        Err(e) => return Err(e),
-                    }
+    /// Extract frontmatter from content if present
+    pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
+        // Extract YAML and content
+        match Self::extract_yaml_and_content(content) {
+            Ok((Some(yaml), content_without_frontmatter)) => {
+                // Parse the YAML
+                match Self::from_str(&yaml) {
+                    Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
+                    Err(e) => Err(e),
                 }
-
-                Ok((Some(Self::new(created, tags)), document.content.trim_start().to_string()))
             },
-            Err(e) => Err(FrontmatterError::InvalidYaml(e.to_string()).into()),
+            Ok((None, content_without_frontmatter)) => {
+                // No frontmatter or empty frontmatter
+                Ok((None, content_without_frontmatter))
+            },
+            Err(e) => Err(e),
         }
     }
 }

@@ -354,7 +354,6 @@ dependencies = [
  "serde_yaml",
  "tempfile",
  "thiserror",
- "yaml-front-matter",
 ]
 
 [[package]]
@@ -772,16 +771,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "yaml-front-matter"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a94fb32d2b438e3fddf901fbfe9eb87b34d63853ca6c6da5d2ab7e27031e0bae"
-dependencies = [
- "serde",
- "serde_yaml",
 ]
 
 [[package]]
