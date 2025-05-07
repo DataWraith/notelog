@@ -33,6 +33,11 @@ impl Frontmatter {
         Self::with_tags(vec![default_tag])
     }
 
+    /// Create a new frontmatter with the current timestamp and no tags
+    pub fn with_no_tags() -> Self {
+        Self::with_tags(vec![])
+    }
+
     /// Get the creation timestamp
     pub fn created(&self) -> &DateTime<Local> {
         &self.created
@@ -49,10 +54,15 @@ impl Frontmatter {
         let created_iso = self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
 
         // Format tags for YAML
-        let mut tags_yaml = String::from("tags:");
-        for tag in &self.tags {
-            tags_yaml.push_str(&format!("\n  - {}", tag));
-        }
+        let tags_yaml = if self.tags.is_empty() {
+            String::from("tags: []")
+        } else {
+            let mut yaml = String::from("tags:");
+            for tag in &self.tags {
+                yaml.push_str(&format!("\n  - {}", tag));
+            }
+            yaml
+        };
 
         format!("---\ncreated: {}\n{}\n---", created_iso, tags_yaml)
     }
@@ -107,6 +117,7 @@ impl fmt::Display for Frontmatter {
 #[derive(Serialize, Deserialize, Debug)]
 struct FrontmatterData {
     created: String,
+    #[serde(default)]
     tags: Vec<String>,
 }
 
@@ -152,16 +163,11 @@ impl TryFrom<String> for Frontmatter {
 /// Generate YAML frontmatter for a note
 pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Option<&Vec<Tag>>) -> String {
     let frontmatter = if let Some(tags) = tags {
-        if tags.is_empty() {
-            // Use default tag if tags vector is empty
-            Frontmatter::new(created.clone(), vec![Tag::new("log").expect("Default tag 'log' should be valid")])
-        } else {
-            Frontmatter::new(created.clone(), tags.clone())
-        }
+        // Use the provided tags, even if empty
+        Frontmatter::new(created.clone(), tags.clone())
     } else {
-        // No tags provided, use default tag
-        let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
-        Frontmatter::new(created.clone(), vec![default_tag])
+        // No tags provided, use empty tags vector
+        Frontmatter::new(created.clone(), vec![])
     };
 
     frontmatter.apply_to_content(content)
@@ -312,6 +318,10 @@ mod tests {
         let frontmatter = Frontmatter::default();
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "log");
+
+        // Test with_no_tags constructor
+        let frontmatter = Frontmatter::with_no_tags();
+        assert_eq!(frontmatter.tags().len(), 0);
     }
 
     #[test]
@@ -321,11 +331,19 @@ mod tests {
         let tag2 = Tag::new("bar").unwrap();
         let tags = vec![tag1, tag2];
 
-        let frontmatter = Frontmatter::new(date, tags);
+        let frontmatter = Frontmatter::new(date.clone(), tags);
         let yaml = frontmatter.to_yaml();
 
         assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
         assert!(yaml.contains("tags:\n  - foo\n  - bar"));
+        assert!(yaml.ends_with("---"));
+
+        // Test with empty tags
+        let frontmatter = Frontmatter::new(date, vec![]);
+        let yaml = frontmatter.to_yaml();
+
+        assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(yaml.contains("tags: []"));
         assert!(yaml.ends_with("---"));
     }
 
@@ -438,10 +456,17 @@ mod tests {
         let content = "# Test Title\nThis is the content";
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
 
-        // Test with default tags
+        // Test with no tags
         let frontmatter = generate_frontmatter(content, &date, None);
         assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags:\n  - log"));
+        assert!(frontmatter.contains("tags: []"));
+        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+
+        // Test with empty tags vector
+        let empty_tags: Vec<Tag> = vec![];
+        let frontmatter = generate_frontmatter(content, &date, Some(&empty_tags));
+        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(frontmatter.contains("tags: []"));
         assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
 
         // Test with custom tags

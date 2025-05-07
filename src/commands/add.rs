@@ -63,11 +63,9 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 user_content.clone()
             } else {
                 let base_content = args.title.as_ref().map(|t| format!("# {}", t)).unwrap_or_default();
-                let frontmatter = if tags.is_empty() {
-                    Frontmatter::default()
-                } else {
-                    Frontmatter::with_tags(tags.clone())
-                };
+                // When opening the editor, use default tag if no tags provided
+                // This makes it easier for users to add tags
+                let frontmatter = Frontmatter::default();
                 frontmatter.apply_to_content(&base_content)
             };
 
@@ -145,7 +143,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
         // Empty frontmatter, remove it and add proper frontmatter
         let content_without_frontmatter = remove_empty_frontmatter(&content);
         let frontmatter = if tags.is_empty() {
-            Frontmatter::default()
+            Frontmatter::with_no_tags()
         } else {
             Frontmatter::with_tags(tags.clone())
         };
@@ -153,7 +151,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     } else {
         // No frontmatter, add it
         let frontmatter = if tags.is_empty() {
-            Frontmatter::default()
+            Frontmatter::with_no_tags()
         } else {
             Frontmatter::with_tags(tags.clone())
         };
