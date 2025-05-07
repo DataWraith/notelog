@@ -5,10 +5,12 @@ use chrono::Local;
 
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
+use crate::frontmatter::{
+    generate_frontmatter, has_empty_frontmatter, has_frontmatter, remove_empty_frontmatter, validate_frontmatter,
+};
 use crate::utils::{
-    create_date_directories, extract_tags_from_args, extract_title, generate_filename, generate_frontmatter,
-    has_empty_frontmatter, has_frontmatter, open_editor, read_file_content, remove_empty_frontmatter,
-    validate_content, validate_frontmatter, wait_for_user_input,
+    create_date_directories, extract_tags_from_args, extract_title, generate_filename, open_editor,
+    read_file_content, validate_content, wait_for_user_input,
 };
 
 /// Add a new note
