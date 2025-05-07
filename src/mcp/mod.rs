@@ -1,8 +1,8 @@
 //! MCP (Model Context Protocol) implementation for notelog
 
-mod calculator;
+mod add_note;
 
-pub use calculator::Calculator;
+pub use add_note::AddNote;
 
 use rmcp::ServerHandler;
 use tokio::runtime::Runtime;

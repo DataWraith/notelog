@@ -1,9 +1,13 @@
 //! Note implementation for notelog
 
+use std::fs;
+use std::path::Path;
 use std::str::FromStr;
+use chrono::Local;
 
 use crate::core::frontmatter::Frontmatter;
 use crate::error::{NotelogError, Result};
+use crate::utils::{create_date_directories, generate_filename};
 
 /// Represents a complete note with frontmatter and content
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +65,47 @@ impl Note {
 
         title
     }
+
+    /// Save the note to disk in the appropriate directory
+    ///
+    /// Returns the path to the saved note file
+    pub fn save(&self, notes_dir: &Path, title_override: Option<&str>) -> Result<String> {
+        // Get the current date and time
+        let now = Local::now();
+
+        // Create the year and month directories
+        let month_dir = create_date_directories(notes_dir, &now)?;
+
+        // Determine the title to use for the filename
+        let title = match title_override {
+            Some(title) => title.to_string(),
+            None => self.extract_title(),
+        };
+
+        if title.is_empty() {
+            return Err(NotelogError::EmptyContent);
+        }
+
+        // Generate the filename
+        let mut filename = generate_filename(&now, &title, None);
+        let mut counter = 2;
+
+        // Check for filename collisions
+        while month_dir.join(&filename).exists() {
+            filename = generate_filename(&now, &title, Some(counter));
+            counter += 1;
+        }
+
+        // Get the full content with frontmatter
+        let final_content = self.to_string();
+
+        // Write the note to the file
+        let note_path = month_dir.join(&filename);
+        fs::write(&note_path, final_content)?;
+
+        // Return the path as a string
+        Ok(note_path.to_string_lossy().to_string())
+    }
 }
 
 impl FromStr for Note {
@@ -91,6 +136,7 @@ impl FromStr for Note {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_note_from_str() {
@@ -157,5 +203,57 @@ mod tests {
         let extracted = note.extract_title();
         assert_eq!(extracted.len(), 100);
         assert_eq!(extracted, "A".repeat(100));
+    }
+
+    #[test]
+    fn test_save() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a note
+        let frontmatter = Frontmatter::default();
+        let content = "# Test Save\nThis is a test of the save method.";
+        let note = Note::new(frontmatter, content.to_string());
+
+        // Save the note
+        let result = note.save(notes_dir, None);
+        assert!(result.is_ok());
+
+        // Verify the file was created
+        let path = result.unwrap();
+        let path = Path::new(&path);
+        assert!(path.exists());
+
+        // Verify the content
+        let saved_content = fs::read_to_string(path).unwrap();
+        assert!(saved_content.contains("# Test Save"));
+        assert!(saved_content.contains("This is a test of the save method."));
+        assert!(saved_content.contains("tags:\n  - log"));
+    }
+
+    #[test]
+    fn test_save_with_title_override() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a note
+        let frontmatter = Frontmatter::default();
+        let content = "# Original Title\nThis is a test of the save method with title override.";
+        let note = Note::new(frontmatter, content.to_string());
+
+        // Save the note with a title override
+        let result = note.save(notes_dir, Some("Custom Title"));
+        assert!(result.is_ok());
+
+        // Verify the file was created with the custom title in the filename
+        let path = result.unwrap();
+        assert!(path.contains("Custom Title"));
+
+        // Verify the content still has the original title
+        let path = Path::new(&path);
+        let saved_content = fs::read_to_string(path).unwrap();
+        assert!(saved_content.contains("# Original Title"));
     }
 }

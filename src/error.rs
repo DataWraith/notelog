@@ -67,6 +67,9 @@ pub enum NotelogError {
 
     #[error("Frontmatter validation error: {0}")]
     FrontmatterError(#[from] FrontmatterError),
+
+    #[error("Operation cancelled by user")]
+    UserCancelled,
 }
 
 pub type Result<T> = std::result::Result<T, NotelogError>;

@@ -42,7 +42,7 @@ fn run() -> Result<()> {
             } else {
                 Vec::new()
             };
-            commands::add_note(&notes_dir, args, stdin_content)
+            commands::add_note(&notes_dir, args, stdin_content).map(|_| ())
         }
         Some(Commands::Mcp(args)) => commands::mcp_command(&notes_dir, args),
         None => {
@@ -61,7 +61,7 @@ fn run() -> Result<()> {
             } else {
                 Vec::new()
             };
-            commands::add_note(&notes_dir, add_args, stdin_content)
+            commands::add_note(&notes_dir, add_args, stdin_content).map(|_| ())
         }
     }
 }

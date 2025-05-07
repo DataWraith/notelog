@@ -1,8 +1,5 @@
-use std::fs;
 use std::path::Path;
 use std::str::FromStr;
-
-use chrono::Local;
 
 use crate::cli::AddArgs;
 use crate::core::frontmatter::Frontmatter;
@@ -10,18 +7,30 @@ use crate::core::note::Note;
 use crate::core::tags::extract_tags_from_args;
 use crate::error::{NotelogError, Result};
 use crate::utils::{
-    create_date_directories, extract_title, generate_filename, open_editor, read_file_content,
-    validate_content, wait_for_user_input,
+    open_editor, read_file_content, validate_content, wait_for_user_input,
 };
 
-/// Add a new note
-pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Result<()> {
-    // Get the current date and time
-    let now = Local::now();
+/// Create a note from various input sources and save it
+///
+/// Returns the path to the created note file on success
+pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Result<String> {
+    // Create a note from the input
+    let (note, title_override) = create_note_from_input(args, stdin_content)?;
 
-    // Create the year and month directories
-    let month_dir = create_date_directories(notes_dir, &now)?;
+    // Save the note to disk
+    let note_path = note.save(notes_dir, title_override.as_deref())?;
 
+    // Print success message
+    println!("Note saved to: {}", note_path);
+
+    // Return the path
+    Ok(note_path)
+}
+
+/// Create a Note object from various input sources
+///
+/// Returns a tuple of (Note, Option<String>) where the second element is an optional title override
+pub fn create_note_from_input(args: AddArgs, stdin_content: Vec<u8>) -> Result<(Note, Option<String>)> {
     // Extract tags from command line arguments
     let (tags, non_tag_args) = extract_tags_from_args(&args.args)?;
 
@@ -74,7 +83,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
             // Check if the content is completely blank
             if content.trim().is_empty() {
                 println!("Note is empty. Exiting without saving.");
-                return Ok(());
+                return Err(NotelogError::EmptyContent);
             }
 
             // Check if content has frontmatter and validate it
@@ -99,7 +108,7 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                         _ => {
                             // User pressed Ctrl+C or there was an error
                             println!("Exiting without saving.");
-                            return Ok(());
+                            return Err(NotelogError::UserCancelled);
                         }
                     }
                 }
@@ -111,52 +120,27 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
 
     validate_content(content.as_bytes())?;
 
-    // Determine the title
-    let title = match &args.title {
-        Some(title) => title.clone(),
-        None => extract_title(&content),
-    };
+    // Get the title override if provided
+    let title_override = args.title.clone();
 
-    if title.is_empty() {
-        return Err(NotelogError::EmptyContent);
-    }
-
-    // Generate the filename
-    let mut filename = generate_filename(&now, &title, None);
-    let mut counter = 2;
-
-    // Check for filename collisions
-    while month_dir.join(&filename).exists() {
-        filename = generate_filename(&now, &title, Some(counter));
-        counter += 1;
-    }
-
-    // Add or regenerate frontmatter as needed
-    let final_content = match Note::from_str(&content) {
+    // Create the note object
+    let note = match Note::from_str(&content) {
         Ok(note) => {
             if note.frontmatter().tags().is_empty() && !tags.is_empty() {
                 // Note has no tags but we have tags from command line
-                let frontmatter = Frontmatter::with_tags(tags.clone());
-                let note = Note::new(frontmatter, note.content().to_string());
-                note.to_string()
+                let frontmatter = Frontmatter::with_tags(tags);
+                Note::new(frontmatter, note.content().to_string())
             } else {
                 // Note already has valid frontmatter or no tags specified
-                content
+                note
             }
         }
         _ => {
             // Invalid frontmatter, add a new one
-            let frontmatter = Frontmatter::with_tags(tags.clone());
-            let note = Note::new(frontmatter, content);
-            note.to_string()
+            let frontmatter = Frontmatter::with_tags(tags);
+            Note::new(frontmatter, content)
         }
     };
 
-    // Write the note to the file
-    let note_path = month_dir.join(filename);
-    fs::write(&note_path, final_content)?;
-
-    println!("Note saved to: {}", note_path.display());
-
-    Ok(())
+    Ok((note, title_override))
 }
