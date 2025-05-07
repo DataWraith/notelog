@@ -8,8 +8,9 @@ use crate::error::{NotelogError, Result};
 use crate::frontmatter::{
     generate_frontmatter, has_empty_frontmatter, has_frontmatter, remove_empty_frontmatter, validate_frontmatter,
 };
+use crate::tags::extract_tags_from_args;
 use crate::utils::{
-    create_date_directories, extract_tags_from_args, extract_title, generate_filename, open_editor,
+    create_date_directories, extract_title, generate_filename, open_editor,
     read_file_content, validate_content, wait_for_user_input,
 };
 
