@@ -1,11 +1,13 @@
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 
 use chrono::Local;
 
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
 use crate::frontmatter::Frontmatter;
+use crate::note::Note;
 use crate::tags::extract_tags_from_args;
 use crate::utils::{
     create_date_directories, extract_title, generate_filename, open_editor,
@@ -73,13 +75,9 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
             }
 
             // Check if content has frontmatter and validate it
-            match Frontmatter::extract_from_content(&content) {
-                Ok((None, _)) => {
-                    // No frontmatter, we'll add it later
-                    break;
-                },
-                Ok((Some(_), _)) => {
-                    // Frontmatter is valid
+            match Note::from_str(&content) {
+                Ok(_) => {
+                    // Note is valid (either has valid frontmatter or no frontmatter)
                     break;
                 },
                 Err(e) => {
@@ -131,16 +129,23 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     }
 
     // Add or regenerate frontmatter as needed
-    let final_content = match Frontmatter::extract_from_content(&content) {
-        Ok((Some(_), _)) => {
-            // Content already has valid frontmatter (from editor)
-            // We've already validated it above, so we can use it as is
-            content
+    let final_content = match Note::from_str(&content) {
+        Ok(note) => {
+            if note.frontmatter().tags().is_empty() && !tags.is_empty() {
+                // Note has no tags but we have tags from command line
+                let frontmatter = Frontmatter::with_tags(tags.clone());
+                let note = Note::new(frontmatter, note.content().to_string());
+                note.to_string()
+            } else {
+                // Note already has valid frontmatter or no tags specified
+                content
+            }
         },
         _ => {
-            // No frontmatter or invalid frontmatter, add it
+            // Invalid frontmatter, add a new one
             let frontmatter = Frontmatter::with_tags(tags.clone());
-            frontmatter.apply_to_content(&content)
+            let note = Note::new(frontmatter, content);
+            note.to_string()
         }
     };
 

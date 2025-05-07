@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod error;
 mod frontmatter;
+mod note;
 mod tags;
 mod utils;
 

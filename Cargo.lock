@@ -351,6 +351,7 @@ dependencies = [
  "clap",
  "dirs",
  "serde",
+ "serde_yaml",
  "tempfile",
  "thiserror",
  "yaml-front-matter",
