@@ -5,10 +5,7 @@ use chrono::Local;
 
 use crate::cli::AddArgs;
 use crate::error::{NotelogError, Result};
-use crate::frontmatter::{
-    Frontmatter, has_empty_frontmatter, has_frontmatter,
-    remove_empty_frontmatter, validate_frontmatter,
-};
+use crate::frontmatter::Frontmatter;
 use crate::tags::extract_tags_from_args;
 use crate::utils::{
     create_date_directories, extract_title, generate_filename, open_editor,
@@ -75,15 +72,16 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
                 return Ok(());
             }
 
-            // Check if content has frontmatter
-            if !has_frontmatter(&content) {
-                // No frontmatter or empty frontmatter, we'll add it later
-                break;
-            }
-
-            // Validate the frontmatter
-            match validate_frontmatter(&content) {
-                Ok(_) => break,  // Frontmatter is valid
+            // Check if content has frontmatter and validate it
+            match Frontmatter::extract_from_content(&content) {
+                Ok((None, _)) => {
+                    // No frontmatter, we'll add it later
+                    break;
+                },
+                Ok((Some(_), _)) => {
+                    // Frontmatter is valid
+                    break;
+                },
                 Err(e) => {
                     eprintln!("Error in YAML frontmatter: {}", e);
 
@@ -133,27 +131,17 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     }
 
     // Add or regenerate frontmatter as needed
-    let final_content = if has_frontmatter(&content) {
-        // Content already has frontmatter (from editor)
-        // We've already validated it above, so we can use it as is
-        content
-    } else if has_empty_frontmatter(&content) {
-        // Empty frontmatter, remove it and add proper frontmatter
-        let content_without_frontmatter = remove_empty_frontmatter(&content);
-        let frontmatter = if tags.is_empty() {
-            Frontmatter::with_no_tags()
-        } else {
-            Frontmatter::with_tags(tags.clone())
-        };
-        frontmatter.apply_to_content(&content_without_frontmatter)
-    } else {
-        // No frontmatter, add it
-        let frontmatter = if tags.is_empty() {
-            Frontmatter::with_no_tags()
-        } else {
-            Frontmatter::with_tags(tags.clone())
-        };
-        frontmatter.apply_to_content(&content)
+    let final_content = match Frontmatter::extract_from_content(&content) {
+        Ok((Some(_), _)) => {
+            // Content already has valid frontmatter (from editor)
+            // We've already validated it above, so we can use it as is
+            content
+        },
+        _ => {
+            // No frontmatter or invalid frontmatter, add it
+            let frontmatter = Frontmatter::with_tags(tags.clone());
+            frontmatter.apply_to_content(&content)
+        }
     };
 
     // Write the note to the file

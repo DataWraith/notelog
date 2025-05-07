@@ -33,11 +33,6 @@ impl Frontmatter {
         Self::with_tags(vec![default_tag])
     }
 
-    /// Create a new frontmatter with the current timestamp and no tags
-    pub fn with_no_tags() -> Self {
-        Self::with_tags(vec![])
-    }
-
     /// Get the creation timestamp
     pub fn created(&self) -> &DateTime<Local> {
         &self.created
@@ -306,8 +301,8 @@ mod tests {
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "log");
 
-        // Test with_no_tags constructor
-        let frontmatter = Frontmatter::with_no_tags();
+        // Test creating with empty tags
+        let frontmatter = Frontmatter::with_tags(vec![]);
         assert_eq!(frontmatter.tags().len(), 0);
     }
 
