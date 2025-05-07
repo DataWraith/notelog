@@ -74,7 +74,7 @@ pub fn create_date_directories(notes_dir: &Path, date: &DateTime<Local>) -> Resu
 
 /// Generate a valid filename from a title
 pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<usize>) -> String {
-    let date_str = date.format("%Y-%m-%d").to_string();
+    let date_str = date.format("%Y-%m-%dT%H-%M").to_string();
 
     // Sanitize the title for use in a filename
     let sanitized_title = title
@@ -201,7 +201,7 @@ mod tests {
         let title = "Test Title";
         assert_eq!(
             generate_filename(&date, title, None),
-            "2025-04-01 Test Title.md"
+            "2025-04-01T12-00 Test Title.md"
         );
     }
 
@@ -211,7 +211,7 @@ mod tests {
         let title = "Test Title";
         assert_eq!(
             generate_filename(&date, title, Some(1)),
-            "2025-04-01 Test Title (1).md"
+            "2025-04-01T12-00 Test Title (1).md"
         );
     }
 
@@ -221,7 +221,7 @@ mod tests {
         let title = "Test/Title:With*Invalid?Chars";
         assert_eq!(
             generate_filename(&date, title, None),
-            "2025-04-01 Test-Title-With-Invalid-Chars.md"
+            "2025-04-01T12-00 Test-Title-With-Invalid-Chars.md"
         );
     }
 
