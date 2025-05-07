@@ -55,8 +55,6 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
         let mut initial_content: Option<String> = None;
 
         loop {
-            let now = Local::now();
-
             // For the first iteration, use the default initial content
             // For subsequent iterations, use the user's content (even if it has invalid YAML)
             let editor_content = if let Some(ref user_content) = initial_content {

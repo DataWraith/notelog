@@ -160,19 +160,6 @@ impl TryFrom<String> for Frontmatter {
     }
 }
 
-/// Generate YAML frontmatter for a note
-pub fn generate_frontmatter(content: &str, created: &DateTime<Local>, tags: Option<&Vec<Tag>>) -> String {
-    let frontmatter = if let Some(tags) = tags {
-        // Use the provided tags, even if empty
-        Frontmatter::new(created.clone(), tags.clone())
-    } else {
-        // No tags provided, use empty tags vector
-        Frontmatter::new(created.clone(), vec![])
-    };
-
-    frontmatter.apply_to_content(content)
-}
-
 /// Check if content already has YAML frontmatter
 pub fn has_frontmatter(content: &str) -> bool {
     let trimmed = content.trim_start();
@@ -452,31 +439,26 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_frontmatter() {
+    fn test_frontmatter_with_different_tags() {
         let content = "# Test Title\nThis is the content";
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
 
         // Test with no tags
-        let frontmatter = generate_frontmatter(content, &date, None);
-        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags: []"));
-        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
-
-        // Test with empty tags vector
-        let empty_tags: Vec<Tag> = vec![];
-        let frontmatter = generate_frontmatter(content, &date, Some(&empty_tags));
-        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags: []"));
-        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+        let frontmatter = Frontmatter::new(date.clone(), vec![]);
+        let result = frontmatter.apply_to_content(content);
+        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(result.contains("tags: []"));
+        assert!(result.contains("---\n\n# Test Title\nThis is the content\n\n"));
 
         // Test with custom tags
         let tag1 = Tag::new("foo").unwrap();
         let tag2 = Tag::new("bar").unwrap();
         let tags = vec![tag1, tag2];
-        let frontmatter = generate_frontmatter(content, &date, Some(&tags));
-        assert!(frontmatter.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(frontmatter.contains("tags:\n  - foo\n  - bar"));
-        assert!(frontmatter.contains("---\n\n# Test Title\nThis is the content\n\n"));
+        let frontmatter = Frontmatter::new(date.clone(), tags);
+        let result = frontmatter.apply_to_content(content);
+        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(result.contains("tags:\n  - foo\n  - bar"));
+        assert!(result.contains("---\n\n# Test Title\nThis is the content\n\n"));
     }
 
     #[test]
