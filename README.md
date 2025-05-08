@@ -11,9 +11,10 @@ Notes are stored in a local directory as Markdown files with YAML frontmatter, o
 
 ## Installation
 
-No binaries are provided at this time.
+No pre-built binaries are provided at this time. To install:
 
-You can build the project from source and install the binary via `cargo install --path .`.
+1. Clone this repository
+2. Build and install with `cargo install --path .`
 
 ## Usage
 
