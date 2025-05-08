@@ -56,7 +56,24 @@ pub fn create_note_from_input(
         read_file_content(file_path)?
     } else if !non_tag_args.is_empty() {
         // Content from command line arguments
-        non_tag_args.join(" ")
+        let content = non_tag_args.join(" ");
+
+        // If a title is provided and the content doesn't start with a markdown header,
+        // add a markdown header with the title
+        if let Some(title) = &args.title {
+            // Check if the content already has a markdown header
+            if !content.trim_start().starts_with('#') {
+                return Ok((
+                    Note::new(
+                        Frontmatter::with_tags(tags),
+                        format!("# {}\n\n{}", title, content),
+                    ),
+                    Some(title.clone()),
+                ));
+            }
+        }
+
+        content
     } else {
         // Open an editor with frontmatter
         let mut content;
@@ -309,7 +326,26 @@ mod tests {
         let result = create_note_from_input(args, stdin_content).unwrap();
         let (note, title_override) = result;
 
-        assert_eq!(note.content(), "This is a test");
+        // Content should now include a markdown header with the title
+        assert_eq!(note.content(), "# Custom Title\n\nThis is a test");
+        assert_eq!(title_override, Some("Custom Title".to_string()));
+    }
+
+    #[test]
+    fn test_create_note_with_title_override_existing_header() {
+        // Test with title override when content already has a header
+        let args = AddArgs {
+            args: vec!["#".to_string(), "Existing".to_string(), "Header".to_string(), "content".to_string()],
+            file: None,
+            title: Some("Custom Title".to_string()),
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, title_override) = result;
+
+        // Content should remain unchanged since it already has a header
+        assert_eq!(note.content(), "# Existing Header content");
         assert_eq!(title_override, Some("Custom Title".to_string()));
     }
 
