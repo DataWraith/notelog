@@ -145,3 +145,260 @@ pub fn create_note_from_input(
 
     Ok((note, title_override))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::AddArgs;
+    use std::path::PathBuf;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_create_note_from_stdin() {
+        // Test with content from stdin
+        let args = AddArgs {
+            args: vec![],
+            file: None,
+            title: None,
+        };
+        let stdin_content = "This is a test note from stdin".as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, title_override) = result;
+
+        assert_eq!(note.content(), "This is a test note from stdin");
+        assert!(title_override.is_none());
+        assert!(note.frontmatter().tags().is_empty());
+    }
+
+    #[test]
+    fn test_create_note_from_stdin_with_tags() {
+        // Test with content from stdin and tags in args
+        let args = AddArgs {
+            args: vec!["+test".to_string(), "+tag2".to_string()],
+            file: None,
+            title: None,
+        };
+        let stdin_content = "This is a test note with tags".as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, _) = result;
+
+        // Check that the content is preserved
+        assert_eq!(note.content(), "This is a test note with tags");
+
+        // Check that the tags from args were applied
+        let tags = note.frontmatter().tags();
+        assert_eq!(tags.len(), 2);
+        assert!(tags.iter().any(|t| t.as_str() == "test"));
+        assert!(tags.iter().any(|t| t.as_str() == "tag2"));
+    }
+
+    #[test]
+    fn test_create_note_from_stdin_with_file() {
+        // Test with content from stdin and file (should error)
+        let args = AddArgs {
+            args: vec![],
+            file: Some(PathBuf::from("test.txt")),
+            title: None,
+        };
+        let stdin_content = "This is a test note".as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), NotelogError::ConflictingInputMethods));
+    }
+
+    #[test]
+    fn test_create_note_from_file() -> Result<()> {
+        // Create a temporary file with test content
+        let mut temp_file = NamedTempFile::new()?;
+        use std::io::Write;
+        writeln!(temp_file, "This is a test note from a file")?;
+
+        let args = AddArgs {
+            args: vec![],
+            file: Some(temp_file.path().to_path_buf()),
+            title: None,
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content)?;
+        let (note, title_override) = result;
+
+        assert!(note.content().contains("This is a test note from a file"));
+        assert!(title_override.is_none());
+        assert!(note.frontmatter().tags().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_note_from_file_with_args() {
+        // Test with content from file and non-tag args (should error)
+        let args = AddArgs {
+            args: vec!["some".to_string(), "args".to_string()],
+            file: Some(PathBuf::from("test.txt")),
+            title: None,
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), NotelogError::ConflictingInputMethods));
+    }
+
+    #[test]
+    fn test_create_note_from_args() {
+        // Test with content from command line arguments
+        let args = AddArgs {
+            args: vec!["This".to_string(), "is".to_string(), "a".to_string(), "test".to_string(), "note".to_string()],
+            file: None,
+            title: None,
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, title_override) = result;
+
+        assert_eq!(note.content(), "This is a test note");
+        assert!(title_override.is_none());
+        assert!(note.frontmatter().tags().is_empty());
+    }
+
+    #[test]
+    fn test_create_note_from_args_with_tags() {
+        // Test with content and tags from command line arguments
+        let args = AddArgs {
+            args: vec![
+                "This".to_string(),
+                "is".to_string(),
+                "a".to_string(),
+                "+test".to_string(),
+                "note".to_string(),
+                "+tag2".to_string()
+            ],
+            file: None,
+            title: None,
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, title_override) = result;
+
+        assert_eq!(note.content(), "This is a note");
+        assert!(title_override.is_none());
+
+        // Check that tags were extracted correctly
+        let tags = note.frontmatter().tags();
+        assert_eq!(tags.len(), 2);
+        assert!(tags.iter().any(|t| t.as_str() == "test"));
+        assert!(tags.iter().any(|t| t.as_str() == "tag2"));
+    }
+
+    #[test]
+    fn test_create_note_with_title_override() {
+        // Test with title override
+        let args = AddArgs {
+            args: vec!["This".to_string(), "is".to_string(), "a".to_string(), "test".to_string()],
+            file: None,
+            title: Some("Custom Title".to_string()),
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, title_override) = result;
+
+        assert_eq!(note.content(), "This is a test");
+        assert_eq!(title_override, Some("Custom Title".to_string()));
+    }
+
+    #[test]
+    fn test_create_note_with_frontmatter_in_content() {
+        // Test with content that already has frontmatter
+        let content = r#"---
+created: 2025-04-01T12:00:00+00:00
+tags:
+  - existing
+---
+
+# Note with existing frontmatter"#;
+
+        let args = AddArgs {
+            args: vec![],
+            file: None,
+            title: None,
+        };
+        let stdin_content = content.as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, _) = result;
+
+        assert_eq!(note.content(), "# Note with existing frontmatter");
+
+        // Check that the existing frontmatter was preserved
+        let tags = note.frontmatter().tags();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].as_str(), "existing");
+    }
+
+    #[test]
+    fn test_create_note_with_frontmatter_and_command_line_tags() {
+        // Test with content that has frontmatter and additional tags from command line
+        let content = r#"---
+created: 2025-04-01T12:00:00+00:00
+tags:
+  - existing
+---
+
+# Note with existing frontmatter"#;
+
+        let args = AddArgs {
+            args: vec!["+cli-tag".to_string()],
+            file: None,
+            title: None,
+        };
+        let stdin_content = content.as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, _) = result;
+
+        // Check that the content is preserved
+        assert_eq!(note.content(), "# Note with existing frontmatter");
+
+        // Check that the existing frontmatter tags are preserved (not replaced by command line tags)
+        // since the note already has tags
+        let tags = note.frontmatter().tags();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].as_str(), "existing");
+    }
+
+    #[test]
+    fn test_create_note_with_empty_frontmatter_and_command_line_tags() {
+        // Test with content that has empty frontmatter and tags from command line
+        let content = r#"---
+created: 2025-04-01T12:00:00+00:00
+tags: []
+---
+
+# Note with empty tags"#;
+
+        let args = AddArgs {
+            args: vec!["+cli-tag".to_string()],
+            file: None,
+            title: None,
+        };
+        let stdin_content = content.as_bytes().to_vec();
+
+        let result = create_note_from_input(args, stdin_content).unwrap();
+        let (note, _) = result;
+
+        // Check that the content is preserved
+        assert_eq!(note.content(), "# Note with empty tags");
+
+        // Check that the command line tags were applied since the note has empty tags
+        let tags = note.frontmatter().tags();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].as_str(), "cli-tag");
+    }
+}
