@@ -16,9 +16,11 @@ pub struct AddNoteRequest {
     /// The content of the note in Markdown format
     #[schemars(description = "The content of the note in Markdown format")]
     pub content: String,
-    
+
     /// Optional tags for the note (up to 10)
-    #[schemars(description = "Optional tags for the note (up to 10). Tags should start with '+' and can only contain lowercase letters, numbers, and dashes.")]
+    #[schemars(
+        description = "Optional tags for the note (up to 10). Tags should start with '+' and can only contain lowercase letters, numbers, and dashes."
+    )]
     #[serde(default)]
     pub tags: Vec<String>,
 }
@@ -66,10 +68,10 @@ impl AddNote {
 
         // Create a frontmatter with the tags
         let frontmatter = Frontmatter::with_tags(tags);
-        
+
         // Create a note with the frontmatter and content
         let note = Note::new(frontmatter, request.content);
-        
+
         // Save the note
         match note.save(Path::new(&self.notes_dir), None) {
             Ok(note_path) => format!("Note added successfully: {}", note_path),
@@ -82,25 +84,7 @@ impl AddNote {
 #[tool(tool_box)]
 impl ServerHandler for AddNote {
     fn get_info(&self) -> ServerInfo {
-        let instructions = r###"
-NoteLog is a command-line tool for recording notes as Markdown files with YAML frontmatter, organized by year and month. 
-Use the AddNote tool to create new notes in order to capture the user's thoughts, todos, accomplishments or summarize the conversation history.
-
-To add a note, provide:
-1. Markdown content for your note, beginning with a level 1 heading (e.g., # My Note Title)
-2. Optional tags (up to 10) that are relevant to the content
-
-Valid tags:
-- Must start with a '+' prefix (e.g., +project)
-- Can only contain lowercase letters, numbers, and dashes
-- Cannot start or end with a dash
-
-Example JSON:
-{
-  "content": "# Meeting Notes\nDiscussed project timeline and next steps.",
-  "tags": ["+meeting", "+project"]
-}
-"###;
+        let instructions = include_str!("add_note_instructions.md");
 
         ServerInfo {
             instructions: Some(instructions.into()),
