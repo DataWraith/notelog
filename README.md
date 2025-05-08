@@ -28,11 +28,38 @@ notelog add --title "This is a note" --file /path/to/file
 notelog foo bar baz --title 'Metasyntactic variables'
 
 # Add a note from stdin
-echo "Lorem ipsum" | notelog 
+echo "Lorem ipsum" | notelog
 
 # Add a note with a specific notes directory
 notelog -d ~/Notes add -t "Wellerman" There once was a ship
 ```
+
+### MCP Server
+
+The MCP (Model Context Protocol) server allows AI assistants to interact with Notelog directly. When running in MCP mode, Notelog acts as a server that can receive commands from AI models that support the protocol.
+
+#### Example JSON Configuration
+
+```json
+{
+  "mcpServers": {
+    "notelog": {
+      "command": "notelog",
+      "args": [
+        "mcp",
+        "-d",
+        "/path/to/your/NoteLog/directory"
+      ]
+    }
+  }
+}
+```
+
+#### Available Tools 
+
+| Tool Name | Description |
+|-----------|-------------|
+| add_note  | Add a new note to your NoteLog directory |
 
 ### Notes Directory
 
