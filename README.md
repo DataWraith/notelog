@@ -1,5 +1,9 @@
 # Notelog
 
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
+
+**Status**: Early prototype. Use at your own risk.
+
 Notelog is a command-line tool that records notes as you think of them -- shower thoughts, todos, insights, etc.
 
 Notes are stored in a local directory as Markdown files with YAML frontmatter, organized by year and month.
