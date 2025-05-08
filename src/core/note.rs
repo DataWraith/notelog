@@ -39,7 +39,7 @@ impl Note {
 
     /// Convert the note to a string with frontmatter and content
     pub fn to_string(&self) -> String {
-        format!("{}\n\n{}\n\n", self.frontmatter, self.content)
+        format!("{}\n\n{}\n\n", self.frontmatter, self.content.trim_end())
     }
 
     /// Extract title from the note content
