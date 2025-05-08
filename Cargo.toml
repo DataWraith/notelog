@@ -1,7 +1,7 @@
 [package]
 name = "notelog"
 description = "A tool for quickly logging notes from the command-line or via the Model Context Protocol."
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "BlueOak-1.0.0"
 keywords = ["note-taking", "mcp-server"]
