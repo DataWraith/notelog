@@ -99,10 +99,6 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
     }
 }
 
-/// Extract title from note content
-pub fn extract_title(content: &str) -> String {
-    crate::core::frontmatter::extract_title_from_content_with_frontmatter(content)
-}
 
 /// Check if content is valid
 pub fn validate_content(content: &[u8]) -> Result<()> {
@@ -193,14 +189,7 @@ mod tests {
     use crate::error::NotelogError;
     use chrono::TimeZone;
 
-    #[test]
-    fn test_extract_title_delegates_to_frontmatter() {
-        let content = "This is a title\nThis is the content";
-        assert_eq!(
-            extract_title(content),
-            crate::core::frontmatter::extract_title_from_content_with_frontmatter(content)
-        );
-    }
+
 
     #[test]
     fn test_generate_filename() {

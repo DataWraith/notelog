@@ -164,34 +164,7 @@ impl FromStr for Frontmatter {
     }
 }
 
-/// Extract title from note content, handling frontmatter if present
-pub fn extract_title_from_content_with_frontmatter(content: &str) -> String {
-    // Extract content without frontmatter
-    let content_without_frontmatter = match Frontmatter::extract_from_content(content) {
-        Ok((_, content_after_frontmatter)) => content_after_frontmatter,
-        Err(_) => content.to_string(), // If there's an error parsing frontmatter, use the original content
-    };
 
-    // Find the first non-empty line in the content
-    let mut title = content_without_frontmatter
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .trim()
-        .to_string();
-
-    // Remove leading '#' characters and trim
-    if title.starts_with('#') {
-        title = title.trim_start_matches('#').trim().to_string();
-    }
-
-    // Truncate to 100 characters maximum
-    if title.len() > 100 {
-        title.truncate(100);
-    }
-
-    title
-}
 
 #[cfg(test)]
 mod tests {
@@ -311,68 +284,5 @@ mod tests {
         assert!(yaml.parse::<Frontmatter>().is_err());
     }
 
-    #[test]
-    fn test_extract_title_from_content_with_frontmatter() {
-        // Plain text
-        let content = "This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
 
-        // Markdown
-        let content = "# This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
-
-        // Multiple hashes
-        let content = "### This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
-
-        // Empty lines
-        let content = "\n\n# This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
-
-        // Long title truncation
-        let long_title = "A".repeat(150);
-        let content = format!("# {}\nThis is the content", long_title);
-        let extracted = extract_title_from_content_with_frontmatter(&content);
-        assert_eq!(extracted.len(), 100);
-        assert_eq!(extracted, "A".repeat(100));
-
-        // With frontmatter
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\n# This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
-
-        // With frontmatter, no title
-        let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - tag1\n---\n\nThis is the content without a title";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is the content without a title"
-        );
-
-        // With empty frontmatter
-        let content = "---\n---\n\n# This is a title\nThis is the content";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is a title"
-        );
-
-        let content = "---\n---\nThis is the content without a title";
-        assert_eq!(
-            extract_title_from_content_with_frontmatter(content),
-            "This is the content without a title"
-        );
-    }
 }
