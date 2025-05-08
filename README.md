@@ -36,7 +36,7 @@ notelog -d ~/Notes add -t "Wellerman" There once was a ship
 
 ### Notes Directory
 
-By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option or by setting the `NOTELOG_DIR` environment variable.
+By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option or by setting the `NOTELOG_DIR` environment variable. You will need to create the directory yourself before using Notelog.
 
 The notes directory is organized as follows:
 ```
