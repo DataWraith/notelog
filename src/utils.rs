@@ -99,7 +99,6 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
     }
 }
 
-
 /// Check if content is valid
 pub fn validate_content(content: &[u8]) -> Result<()> {
     // Check if content is too large (> 50KiB)
@@ -188,8 +187,6 @@ mod tests {
     use super::*;
     use crate::error::NotelogError;
     use chrono::TimeZone;
-
-
 
     #[test]
     fn test_generate_filename() {

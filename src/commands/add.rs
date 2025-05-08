@@ -4,7 +4,7 @@ use std::str::FromStr;
 use crate::cli::AddArgs;
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
-use crate::core::tags::{extract_tags_from_args, Tag};
+use crate::core::tags::{Tag, extract_tags_from_args};
 use crate::error::{NotelogError, Result};
 use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
 
@@ -16,7 +16,7 @@ use crate::utils::{open_editor, read_file_content, validate_content, wait_for_us
 fn add_title_to_content(
     content: String,
     title: Option<&String>,
-    tags: &[Tag]
+    tags: &[Tag],
 ) -> Result<(Note, Option<String>)> {
     if let Some(title) = title {
         // Check if the content already has a markdown header
@@ -245,7 +245,10 @@ mod tests {
 
         let result = create_note_from_input(args, stdin_content);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), NotelogError::ConflictingInputMethods));
+        assert!(matches!(
+            result.unwrap_err(),
+            NotelogError::ConflictingInputMethods
+        ));
     }
 
     #[test]
@@ -290,7 +293,10 @@ mod tests {
         let (note, title_override) = result;
 
         // Content should now include a markdown header with the title
-        assert_eq!(note.content(), "# File Title\n\nThis is a test note from a file\n");
+        assert_eq!(
+            note.content(),
+            "# File Title\n\nThis is a test note from a file\n"
+        );
         assert_eq!(title_override, Some("File Title".to_string()));
 
         Ok(())
@@ -316,7 +322,10 @@ mod tests {
 
         // Content should remain unchanged since it already has a header
         assert!(note.content().starts_with("# Existing Header"));
-        assert!(note.content().contains("This is a test note with an existing header"));
+        assert!(
+            note.content()
+                .contains("This is a test note with an existing header")
+        );
         assert_eq!(title_override, Some("File Title".to_string()));
 
         Ok(())
@@ -334,14 +343,23 @@ mod tests {
 
         let result = create_note_from_input(args, stdin_content);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), NotelogError::ConflictingInputMethods));
+        assert!(matches!(
+            result.unwrap_err(),
+            NotelogError::ConflictingInputMethods
+        ));
     }
 
     #[test]
     fn test_create_note_from_args() {
         // Test with content from command line arguments
         let args = AddArgs {
-            args: vec!["This".to_string(), "is".to_string(), "a".to_string(), "test".to_string(), "note".to_string()],
+            args: vec![
+                "This".to_string(),
+                "is".to_string(),
+                "a".to_string(),
+                "test".to_string(),
+                "note".to_string(),
+            ],
             file: None,
             title: None,
         };
@@ -365,7 +383,7 @@ mod tests {
                 "a".to_string(),
                 "+test".to_string(),
                 "note".to_string(),
-                "+tag2".to_string()
+                "+tag2".to_string(),
             ],
             file: None,
             title: None,
@@ -389,7 +407,12 @@ mod tests {
     fn test_create_note_with_title_override() {
         // Test with title override
         let args = AddArgs {
-            args: vec!["This".to_string(), "is".to_string(), "a".to_string(), "test".to_string()],
+            args: vec![
+                "This".to_string(),
+                "is".to_string(),
+                "a".to_string(),
+                "test".to_string(),
+            ],
             file: None,
             title: Some("Custom Title".to_string()),
         };
@@ -407,7 +430,12 @@ mod tests {
     fn test_create_note_with_title_override_existing_header() {
         // Test with title override when content already has a header
         let args = AddArgs {
-            args: vec!["#".to_string(), "Existing".to_string(), "Header".to_string(), "content".to_string()],
+            args: vec![
+                "#".to_string(),
+                "Existing".to_string(),
+                "Header".to_string(),
+                "content".to_string(),
+            ],
             file: None,
             title: Some("Custom Title".to_string()),
         };

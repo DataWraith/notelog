@@ -172,8 +172,6 @@ impl FromStr for Frontmatter {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,6 +339,4 @@ mod tests {
         let yaml = "tags:\n  - test";
         assert!(yaml.parse::<Frontmatter>().is_err());
     }
-
-
 }
