@@ -6,9 +6,7 @@ use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
 use crate::core::tags::extract_tags_from_args;
 use crate::error::{NotelogError, Result};
-use crate::utils::{
-    open_editor, read_file_content, validate_content, wait_for_user_input,
-};
+use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
 
 /// Create a note from various input sources and save it
 ///
@@ -30,7 +28,10 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
 /// Create a Note object from various input sources
 ///
 /// Returns a tuple of (Note, Option<String>) where the second element is an optional title override
-pub fn create_note_from_input(args: AddArgs, stdin_content: Vec<u8>) -> Result<(Note, Option<String>)> {
+pub fn create_note_from_input(
+    args: AddArgs,
+    stdin_content: Vec<u8>,
+) -> Result<(Note, Option<String>)> {
     // Extract tags from command line arguments
     let (tags, non_tag_args) = extract_tags_from_args(&args.args)?;
 

@@ -1,9 +1,9 @@
 //! Note implementation for notelog
 
+use chrono::Local;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
-use chrono::Local;
 
 use crate::core::frontmatter::Frontmatter;
 use crate::error::{NotelogError, Result};
