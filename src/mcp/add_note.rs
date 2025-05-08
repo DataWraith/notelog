@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rmcp::{
     Error as McpError, ServerHandler,
@@ -29,14 +29,14 @@ pub struct AddNoteRequest {
 #[derive(Debug, Clone)]
 pub struct AddNote {
     /// The directory where notes will be stored
-    notes_dir: String,
+    notes_dir: PathBuf,
 }
 
 impl AddNote {
     /// Create a new AddNote handler with the specified notes directory
     pub fn new<P: AsRef<Path>>(notes_dir: P) -> Self {
         Self {
-            notes_dir: notes_dir.as_ref().to_string_lossy().to_string(),
+            notes_dir: notes_dir.as_ref().to_path_buf(),
         }
     }
 }
@@ -79,7 +79,7 @@ impl AddNote {
         let note = Note::new(frontmatter, request.content);
 
         // Save the note
-        match note.save(Path::new(&self.notes_dir), None) {
+        match note.save(&self.notes_dir, None) {
             Ok(note_path) => Ok(CallToolResult::success(vec![Content::text(format!(
                 "Note added successfully: {}",
                 note_path
@@ -115,6 +115,6 @@ mod tests {
     fn test_add_note_new() {
         let temp_dir = TempDir::new().unwrap();
         let add_note = AddNote::new(temp_dir.path());
-        assert_eq!(add_note.notes_dir, temp_dir.path().to_string_lossy());
+        assert_eq!(add_note.notes_dir, temp_dir.path());
     }
 }
