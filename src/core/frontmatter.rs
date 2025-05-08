@@ -33,6 +33,15 @@ impl Frontmatter {
         Self::with_tags(vec![])
     }
 
+    /// Add a tag to the frontmatter
+    pub fn add_tag(&mut self, tag: Tag) {
+        if self.tags.contains(&tag) {
+            return;
+        }
+
+        self.tags.push(tag);
+    }
+
     /// Get the creation timestamp
     pub fn created(&self) -> &DateTime<Local> {
         &self.created
@@ -48,18 +57,18 @@ impl Frontmatter {
         // Format with one-second precision (no fractional seconds)
         let created_iso = self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
 
-        // Format tags for YAML
-        let tags_yaml = if self.tags.is_empty() {
-            String::from("tags:\n  - edit-me")
-        } else {
-            let mut yaml = String::from("tags:");
+        // Format tags for YAML, omitting the tags array if it's empty
+        let tags_yaml = if !self.tags.is_empty() {
+            let mut yaml = String::from("\ntags:");
             for tag in &self.tags {
                 yaml.push_str(&format!("\n  - {}", tag));
             }
             yaml
+        } else {
+            String::new()
         };
 
-        format!("---\ncreated: {}\n{}\n---", created_iso, tags_yaml)
+        format!("---\ncreated: {}{}\n---", created_iso, tags_yaml)
     }
 
     /// Apply frontmatter to content
@@ -204,6 +213,57 @@ mod tests {
     }
 
     #[test]
+    fn test_frontmatter_add_tag() {
+        // Test adding a tag to an empty frontmatter
+        let mut frontmatter = Frontmatter::default();
+        let tag = Tag::new("test").unwrap();
+        frontmatter.add_tag(tag.clone());
+
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0], tag);
+
+        // Test adding a second tag
+        let tag2 = Tag::new("another").unwrap();
+        frontmatter.add_tag(tag2.clone());
+
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert_eq!(frontmatter.tags()[0], tag);
+        assert_eq!(frontmatter.tags()[1], tag2);
+    }
+
+    #[test]
+    fn test_frontmatter_add_duplicate_tags() {
+        // Test adding duplicate tags
+        let mut frontmatter = Frontmatter::default();
+
+        // Create tags a, b, a, b, c
+        let tag_a1 = Tag::new("a").unwrap();
+        let tag_b1 = Tag::new("b").unwrap();
+        let tag_a2 = Tag::new("a").unwrap(); // Duplicate of a
+        let tag_b2 = Tag::new("b").unwrap(); // Duplicate of b
+        let tag_c = Tag::new("c").unwrap();
+
+        // Add all tags
+        frontmatter.add_tag(tag_a1.clone());
+        frontmatter.add_tag(tag_b1.clone());
+        frontmatter.add_tag(tag_a2.clone()); // Should be ignored as duplicate
+        frontmatter.add_tag(tag_b2.clone()); // Should be ignored as duplicate
+        frontmatter.add_tag(tag_c.clone());
+
+        // Verify we only have 3 unique tags: a, b, c
+        assert_eq!(frontmatter.tags().len(), 3);
+        assert_eq!(frontmatter.tags()[0].as_str(), "a");
+        assert_eq!(frontmatter.tags()[1].as_str(), "b");
+        assert_eq!(frontmatter.tags()[2].as_str(), "c");
+
+        // Try adding a duplicate again
+        frontmatter.add_tag(tag_a1.clone());
+
+        // Verify count still remains at 3
+        assert_eq!(frontmatter.tags().len(), 3);
+    }
+
+    #[test]
     fn test_frontmatter_to_yaml() {
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
         let tag1 = Tag::new("foo").unwrap();
@@ -217,12 +277,12 @@ mod tests {
         assert!(yaml.contains("tags:\n  - foo\n  - bar"));
         assert!(yaml.ends_with("---"));
 
-        // Test with empty tags
+        // Test with empty tags - should omit tags array
         let frontmatter = Frontmatter::new(date, vec![]);
         let yaml = frontmatter.to_yaml();
 
         assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(yaml.contains("tags:\n  - edit-me"));
+        assert!(!yaml.contains("tags:"));
         assert!(yaml.ends_with("---"));
     }
 

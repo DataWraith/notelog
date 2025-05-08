@@ -172,7 +172,8 @@ mod tests {
 
         let result = note.to_string();
         assert!(result.starts_with("---\ncreated:"));
-        assert!(result.contains("tags:\n  - edit-me"));
+        // Empty tags array should be omitted
+        assert!(!result.contains("tags:"));
         assert!(result.contains("---\n\n# Test Content\n\n"));
     }
 
@@ -227,7 +228,8 @@ mod tests {
         let saved_content = fs::read_to_string(path).unwrap();
         assert!(saved_content.contains("# Test Save"));
         assert!(saved_content.contains("This is a test of the save method."));
-        assert!(saved_content.contains("tags:\n  - edit-me"));
+        // Empty tags array should be omitted
+        assert!(!saved_content.contains("tags:"));
     }
 
     #[test]

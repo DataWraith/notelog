@@ -4,7 +4,7 @@ use std::str::FromStr;
 use crate::cli::AddArgs;
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
-use crate::core::tags::extract_tags_from_args;
+use crate::core::tags::{extract_tags_from_args, Tag};
 use crate::error::{NotelogError, Result};
 use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
 
@@ -90,9 +90,13 @@ pub fn create_note_from_input(
                     .as_ref()
                     .map(|t| format!("# {}", t))
                     .unwrap_or_default();
-                // When opening the editor, use default tag if no tags provided
+                // When opening the editor, add a default 'edit-me' tag
                 // This makes it easier for users to add tags
-                let frontmatter = Frontmatter::default();
+                let mut frontmatter = Frontmatter::default();
+                // Add the default 'edit-me' tag
+                if let Ok(tag) = Tag::new("edit-me") {
+                    frontmatter.add_tag(tag);
+                }
                 frontmatter.apply_to_content(&base_content)
             };
 
