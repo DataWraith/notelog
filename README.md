@@ -43,12 +43,14 @@ notelog -d ~/Notes add -t "Wellerman" There once was a ship
 
 When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
 
-The default prompt instructs the LLM to automatically add tags and titles to the notes. You can create notes by just asking the LLM:
+You can create notes by just asking the LLM:
 
 - `/log Added Model Context Protocol support to Notelog +mcp +done`
 - `Create a note: "Use this text verbatim in the note"`
 - `Summarize the conversation so far as a notelog`
 - `Create a note about Topic X. Show me a preview before saving.`
+
+The default prompt instructs the LLM to automatically add tags and a title to the notes if you don't specify them.
 
 #### JSON Configuration
 
@@ -75,7 +77,7 @@ The default prompt instructs the LLM to automatically add tags and titles to the
 
 ### Notes Directory
 
-By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option or by setting the `NOTELOG_DIR` environment variable. You will need to create the directory yourself before using Notelog.
+By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable. You will need to create the directory yourself before using Notelog.
 
 The notes directory is organized as follows:
 ```
