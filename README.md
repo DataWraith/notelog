@@ -2,17 +2,18 @@
 
 [![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
 
-**Status**: Early prototype. Use at your own risk.
+**Status**: This is an early prototype of a personal tool. Use at your own risk.
 
-Notelog is a command-line tool that records notes as you think of them -- shower thoughts, todos, insights, etc.
+
+Notelog is a command-line tool that you can use to record notes as you think of them -- thoughts, todos, insights, accomplishments, etc. It includes a *Model Context Protocol* (MCP) server for use by AI assistants.
 
 Notes are stored in a local directory as Markdown files with YAML frontmatter, organized by year and month.
 
 ## Installation
 
-```bash
-cargo install --path .
-```
+No binaries are provided at this time.
+
+You can build the project from source and install the binary via `cargo install --path .`.
 
 ## Usage
 
@@ -38,11 +39,18 @@ echo "Lorem ipsum" | notelog
 notelog -d ~/Notes add -t "Wellerman" There once was a ship
 ```
 
-### MCP Server
+### Model Context Protocol Server
 
-The MCP (Model Context Protocol) server allows AI assistants to interact with Notelog directly. When running in MCP mode, Notelog acts as a server that can receive commands from AI models that support the protocol.
+When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
 
-#### Example JSON Configuration
+The default prompt instructs the LLM to automatically add tags and titles to the notes. You can create notes by just asking the LLM:
+
+- `/log Added Model Context Protocol support to Notelog +mcp +done`
+- `Create a note: "Use this text verbatim in the note"`
+- `Summarize the conversation so far as a notelog`
+- `Create a note about Topic X. Show me a preview before saving.`
+
+#### JSON Configuration
 
 ```json
 {
