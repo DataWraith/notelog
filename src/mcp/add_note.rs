@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use rmcp::{
-    Error as McpError,
-    ServerHandler,
+    Error as McpError, ServerHandler,
     model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
     schemars, tool,
 };
@@ -50,9 +49,9 @@ impl AddNote {
     fn add_note(&self, #[tool(aggr)] request: AddNoteRequest) -> Result<CallToolResult, McpError> {
         // Validate the number of tags
         if request.tags.len() > 10 {
-            return Ok(CallToolResult::error(
-                vec![Content::text("Too many tags provided. Maximum is 10 tags.")],
-            ));
+            return Ok(CallToolResult::error(vec![Content::text(
+                "Too many tags provided. Maximum is 10 tags.",
+            )]));
         }
 
         // Convert tag strings to Tag objects
@@ -68,7 +67,9 @@ impl AddNote {
 
         // Validate the content
         if request.content.trim().is_empty() {
-            return Ok(CallToolResult::error(vec![Content::text("Note content cannot be empty.")]));
+            return Ok(CallToolResult::error(vec![Content::text(
+                "Note content cannot be empty.",
+            )]));
         }
 
         // Create a frontmatter with the tags
@@ -83,7 +84,10 @@ impl AddNote {
                 "Note added successfully: {}",
                 note_path
             ))])),
-            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "Error: {}",
+                e
+            ))])),
         }
     }
 }
