@@ -45,7 +45,7 @@ impl AddNote {
 #[tool(tool_box)]
 impl AddNote {
     /// Add a new note with the given content and tags
-    #[tool(description = "Add a new note to your NoteLog directory")]
+    #[tool(description = include_str!("add_note_instructions.md"))]
     fn add_note(&self, #[tool(aggr)] request: AddNoteRequest) -> String {
         // Validate the number of tags
         if request.tags.len() > 10 {
@@ -84,7 +84,7 @@ impl AddNote {
 #[tool(tool_box)]
 impl ServerHandler for AddNote {
     fn get_info(&self) -> ServerInfo {
-        let instructions = include_str!("add_note_instructions.md");
+        let instructions = include_str!("server_instructions.md");
 
         ServerInfo {
             instructions: Some(instructions.into()),
