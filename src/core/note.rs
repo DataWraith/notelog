@@ -150,15 +150,13 @@ mod tests {
         // No frontmatter
         let content = "# Just content\nNo frontmatter here";
         let note = Note::from_str(content).unwrap();
-        assert_eq!(note.frontmatter().tags().len(), 1); // Default tag
-        assert_eq!(note.frontmatter().tags()[0].as_str(), "log");
+        assert_eq!(note.frontmatter().tags().len(), 0); // No default tag
         assert_eq!(note.content(), content);
 
         // Empty frontmatter
         let content = "---\n---\nContent";
         let note = Note::from_str(content).unwrap();
-        assert_eq!(note.frontmatter().tags().len(), 1); // Default tag
-        assert_eq!(note.frontmatter().tags()[0].as_str(), "log");
+        assert_eq!(note.frontmatter().tags().len(), 0); // No default tag
         assert_eq!(note.content(), "Content");
 
         // Invalid YAML in frontmatter
@@ -174,7 +172,7 @@ mod tests {
 
         let result = note.to_string();
         assert!(result.starts_with("---\ncreated:"));
-        assert!(result.contains("tags:\n  - log"));
+        assert!(result.contains("tags:\n  - edit-me"));
         assert!(result.contains("---\n\n# Test Content\n\n"));
     }
 
@@ -229,7 +227,7 @@ mod tests {
         let saved_content = fs::read_to_string(path).unwrap();
         assert!(saved_content.contains("# Test Save"));
         assert!(saved_content.contains("This is a test of the save method."));
-        assert!(saved_content.contains("tags:\n  - log"));
+        assert!(saved_content.contains("tags:\n  - edit-me"));
     }
 
     #[test]

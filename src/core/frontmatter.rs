@@ -28,10 +28,9 @@ impl Frontmatter {
         Self::new(Local::now(), tags)
     }
 
-    /// Create a new frontmatter with the current timestamp and default tags
+    /// Create a new frontmatter with the current timestamp and no tags
     pub fn default() -> Self {
-        let default_tag = Tag::new("log").expect("Default tag 'log' should be valid");
-        Self::with_tags(vec![default_tag])
+        Self::with_tags(vec![])
     }
 
     /// Get the creation timestamp
@@ -51,7 +50,7 @@ impl Frontmatter {
 
         // Format tags for YAML
         let tags_yaml = if self.tags.is_empty() {
-            String::from("tags: []")
+            String::from("tags:\n  - edit-me")
         } else {
             let mut yaml = String::from("tags:");
             for tag in &self.tags {
@@ -197,8 +196,7 @@ mod tests {
 
         // Test default constructor
         let frontmatter = Frontmatter::default();
-        assert_eq!(frontmatter.tags().len(), 1);
-        assert_eq!(frontmatter.tags()[0].as_str(), "log");
+        assert_eq!(frontmatter.tags().len(), 0);
 
         // Test creating with empty tags
         let frontmatter = Frontmatter::with_tags(vec![]);
@@ -224,7 +222,7 @@ mod tests {
         let yaml = frontmatter.to_yaml();
 
         assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
-        assert!(yaml.contains("tags: []"));
+        assert!(yaml.contains("tags:\n  - edit-me"));
         assert!(yaml.ends_with("---"));
     }
 
