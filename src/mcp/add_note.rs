@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use rmcp::{
+    Error as McpError,
     ServerHandler,
-    model::{ServerCapabilities, ServerInfo},
+    model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
     schemars, tool,
 };
 
@@ -46,10 +47,12 @@ impl AddNote {
 impl AddNote {
     /// Add a new note with the given content and tags
     #[tool(description = include_str!("add_note_instructions.md"))]
-    fn add_note(&self, #[tool(aggr)] request: AddNoteRequest) -> String {
+    fn add_note(&self, #[tool(aggr)] request: AddNoteRequest) -> Result<CallToolResult, McpError> {
         // Validate the number of tags
         if request.tags.len() > 10 {
-            return "Error: Too many tags provided. Maximum is 10 tags.".to_string();
+            return Ok(CallToolResult::error(
+                vec![Content::text("Too many tags provided. Maximum is 10 tags.")],
+            ));
         }
 
         // Convert tag strings to Tag objects
@@ -57,13 +60,15 @@ impl AddNote {
         for tag_str in &request.tags {
             match Tag::new(tag_str) {
                 Ok(tag) => tags.push(tag),
-                Err(e) => return format!("Error: {}", e),
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::text(e.to_string())]));
+                }
             }
         }
 
         // Validate the content
         if request.content.trim().is_empty() {
-            return "Error: Note content cannot be empty.".to_string();
+            return Ok(CallToolResult::error(vec![Content::text("Note content cannot be empty.")]));
         }
 
         // Create a frontmatter with the tags
@@ -74,8 +79,11 @@ impl AddNote {
 
         // Save the note
         match note.save(Path::new(&self.notes_dir), None) {
-            Ok(note_path) => format!("Note added successfully: {}", note_path),
-            Err(e) => format!("Error: {}", e),
+            Ok(note_path) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Note added successfully: {}",
+                note_path
+            ))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
         }
     }
 }
