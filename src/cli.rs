@@ -30,7 +30,7 @@ pub struct Cli {
 pub enum Commands {
     /// Add a new note
     Add(AddArgs),
-    /// MCP command (not yet implemented)
+    /// Starts the Model Context Protocol server
     Mcp(McpArgs),
 }
 
