@@ -8,6 +8,36 @@ use crate::core::tags::{extract_tags_from_args, Tag};
 use crate::error::{NotelogError, Result};
 use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
 
+/// Helper function to add a markdown header to content if a title is provided and content doesn't already have a header
+///
+/// Returns a tuple of (content, title_override) where:
+/// - content is the possibly modified content with a header
+/// - title_override is the title that was passed in, if any
+fn add_title_to_content(
+    content: String,
+    title: Option<&String>,
+    tags: &[Tag]
+) -> Result<(Note, Option<String>)> {
+    if let Some(title) = title {
+        // Check if the content already has a markdown header
+        if !content.trim_start().starts_with('#') {
+            return Ok((
+                Note::new(
+                    Frontmatter::with_tags(tags.to_vec()),
+                    format!("# {}\n\n{}", title, content),
+                ),
+                Some(title.clone()),
+            ));
+        }
+    }
+
+    // No title provided or content already has a header
+    Ok((
+        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
+        title.cloned(),
+    ))
+}
+
 /// Create a note from various input sources and save it
 ///
 /// Returns the path to the created note file on success
@@ -53,27 +83,16 @@ pub fn create_note_from_input(
             return Err(NotelogError::ConflictingInputMethods);
         }
 
-        read_file_content(file_path)?
+        let content = read_file_content(file_path)?;
+
+        // Use the helper function to add a title if needed
+        return add_title_to_content(content, args.title.as_ref(), &tags);
     } else if !non_tag_args.is_empty() {
         // Content from command line arguments
         let content = non_tag_args.join(" ");
 
-        // If a title is provided and the content doesn't start with a markdown header,
-        // add a markdown header with the title
-        if let Some(title) = &args.title {
-            // Check if the content already has a markdown header
-            if !content.trim_start().starts_with('#') {
-                return Ok((
-                    Note::new(
-                        Frontmatter::with_tags(tags),
-                        format!("# {}\n\n{}", title, content),
-                    ),
-                    Some(title.clone()),
-                ));
-            }
-        }
-
-        content
+        // Use the helper function to add a title if needed
+        return add_title_to_content(content, args.title.as_ref(), &tags);
     } else {
         // Open an editor with frontmatter
         let mut content;
@@ -158,9 +177,8 @@ pub fn create_note_from_input(
             }
         }
         _ => {
-            // Invalid frontmatter, add a new one
-            let frontmatter = Frontmatter::with_tags(tags);
-            Note::new(frontmatter, content)
+            // For invalid frontmatter, use our helper function to handle title
+            return add_title_to_content(content, args.title.as_ref(), &tags);
         }
     };
 
@@ -250,6 +268,56 @@ mod tests {
         assert!(note.content().contains("This is a test note from a file"));
         assert!(title_override.is_none());
         assert!(note.frontmatter().tags().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_note_from_file_with_title() -> Result<()> {
+        // Create a temporary file with test content
+        let mut temp_file = NamedTempFile::new()?;
+        use std::io::Write;
+        writeln!(temp_file, "This is a test note from a file")?;
+
+        let args = AddArgs {
+            args: vec![],
+            file: Some(temp_file.path().to_path_buf()),
+            title: Some("File Title".to_string()),
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content)?;
+        let (note, title_override) = result;
+
+        // Content should now include a markdown header with the title
+        assert_eq!(note.content(), "# File Title\n\nThis is a test note from a file\n");
+        assert_eq!(title_override, Some("File Title".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_note_from_file_with_title_existing_header() -> Result<()> {
+        // Create a temporary file with test content that already has a header
+        let mut temp_file = NamedTempFile::new()?;
+        use std::io::Write;
+        writeln!(temp_file, "# Existing Header")?;
+        writeln!(temp_file, "This is a test note with an existing header")?;
+
+        let args = AddArgs {
+            args: vec![],
+            file: Some(temp_file.path().to_path_buf()),
+            title: Some("File Title".to_string()),
+        };
+        let stdin_content = vec![];
+
+        let result = create_note_from_input(args, stdin_content)?;
+        let (note, title_override) = result;
+
+        // Content should remain unchanged since it already has a header
+        assert!(note.content().starts_with("# Existing Header"));
+        assert!(note.content().contains("This is a test note with an existing header"));
+        assert_eq!(title_override, Some("File Title".to_string()));
 
         Ok(())
     }
