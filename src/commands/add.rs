@@ -138,9 +138,7 @@ fn create_note_from_editor(title: Option<&String>) -> Result<String> {
         let editor_content = if let Some(ref user_content) = initial_content {
             user_content.clone()
         } else {
-            let base_content = title
-                .map(|t| format!("# {}", t))
-                .unwrap_or_default();
+            let base_content = title.map(|t| format!("# {}", t)).unwrap_or_default();
 
             // When opening the editor, add a default 'edit-me' tag.
             // This makes it easier for users to add tags
@@ -154,10 +152,14 @@ fn create_note_from_editor(title: Option<&String>) -> Result<String> {
         };
 
         content = open_editor(Some(&editor_content))?;
+        content = content.trim().to_string();
 
         // Check if the content is completely blank
-        if content.trim().is_empty() {
+        if content.is_empty() {
             println!("Note is empty. Exiting without saving.");
+            return Err(NotelogError::EmptyContent);
+        } else if content.ends_with(&format!("# {}", title.unwrap_or(&String::new()))) {
+            println!("Note has no content. Exiting without saving.");
             return Err(NotelogError::EmptyContent);
         }
 
