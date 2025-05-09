@@ -53,9 +53,12 @@ impl Note {
             .trim()
             .to_string();
 
-        // Remove leading '#' characters and trim
         if title.starts_with('#') {
+            // Remove leading '#' characters
             title = title.trim_start_matches('#').trim().to_string();
+        } else if title.starts_with('-') {
+            // Remove a single leading '-' character
+            title = title.strip_prefix('-').unwrap_or(&title).trim().to_string();
         }
 
         // Truncate to 100 characters maximum
@@ -192,6 +195,11 @@ mod tests {
 
         // Multiple hashes
         let content = "### This is a title\nThis is the content";
+        let note = Note::new(frontmatter.clone(), content.to_string());
+        assert_eq!(note.extract_title(), "This is a title");
+
+        // Single dash prefix
+        let content = "- This is a title\nThis is the content";
         let note = Note::new(frontmatter.clone(), content.to_string());
         assert_eq!(note.extract_title(), "This is a title");
 
