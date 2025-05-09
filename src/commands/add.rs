@@ -64,8 +64,8 @@ pub fn create_note_from_input(
         // Use the helper function to add a title if needed
         return add_title_to_content(content, args.title.as_ref(), &tags);
     } else {
-        // Open an editor with frontmatter
-        let content = create_note_from_editor(args.title.as_ref())?;
+        // Open an editor with frontmatter and any provided tags
+        let content = create_note_from_editor(args.title.as_ref(), &tags)?;
         content
     };
 
@@ -125,10 +125,10 @@ fn add_title_to_content(
     ))
 }
 
-/// Opens an editor for the user to create a note, with optional title
+/// Opens an editor for the user to create a note, with optional title and tags
 ///
 /// Handles the editor loop, validation, and user interaction for creating a note
-fn create_note_from_editor(title: Option<&String>) -> Result<String> {
+fn create_note_from_editor(title: Option<&String>, tags: &[Tag]) -> Result<String> {
     let mut content;
     let mut initial_content: Option<String> = None;
 
@@ -140,12 +140,14 @@ fn create_note_from_editor(title: Option<&String>) -> Result<String> {
         } else {
             let base_content = title.map(|t| format!("# {}", t)).unwrap_or_default();
 
-            // When opening the editor, add a default 'edit-me' tag.
-            // This makes it easier for users to add tags
-            let mut frontmatter = Frontmatter::default();
+            // Create frontmatter with the provided tags
+            let mut frontmatter = Frontmatter::with_tags(tags.to_vec());
 
-            if let Ok(tag) = Tag::new("edit-me") {
-                frontmatter.add_tag(tag);
+            // Only add the 'edit-me' tag if no tags were provided
+            if tags.is_empty() {
+                if let Ok(tag) = Tag::new("edit-me") {
+                    frontmatter.add_tag(tag);
+                }
             }
 
             frontmatter.apply_to_content(&base_content)
