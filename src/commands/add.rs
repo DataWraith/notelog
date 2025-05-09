@@ -8,36 +8,6 @@ use crate::core::tags::{Tag, extract_tags_from_args};
 use crate::error::{NotelogError, Result};
 use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
 
-/// Helper function to add a markdown header to content if a title is provided and content doesn't already have a header
-///
-/// Returns a tuple of (content, title_override) where:
-/// - content is the possibly modified content with a header
-/// - title_override is the title that was passed in, if any
-fn add_title_to_content(
-    content: String,
-    title: Option<&String>,
-    tags: &[Tag],
-) -> Result<(Note, Option<String>)> {
-    if let Some(title) = title {
-        // Check if the content already has a markdown header
-        if !content.trim_start().starts_with('#') {
-            return Ok((
-                Note::new(
-                    Frontmatter::with_tags(tags.to_vec()),
-                    format!("# {}\n\n{}", title, content),
-                ),
-                Some(title.clone()),
-            ));
-        }
-    }
-
-    // No title provided or content already has a header
-    Ok((
-        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
-        title.cloned(),
-    ))
-}
-
 /// Create a note from various input sources and save it
 ///
 /// Returns the path to the created note file on success
@@ -95,67 +65,7 @@ pub fn create_note_from_input(
         return add_title_to_content(content, args.title.as_ref(), &tags);
     } else {
         // Open an editor with frontmatter
-        let mut content;
-        let mut initial_content: Option<String> = None;
-
-        loop {
-            // For the first iteration, use the default initial content
-            // For subsequent iterations, use the user's content (even if it has invalid YAML)
-            let editor_content = if let Some(ref user_content) = initial_content {
-                user_content.clone()
-            } else {
-                let base_content = args
-                    .title
-                    .as_ref()
-                    .map(|t| format!("# {}", t))
-                    .unwrap_or_default();
-                // When opening the editor, add a default 'edit-me' tag
-                // This makes it easier for users to add tags
-                let mut frontmatter = Frontmatter::default();
-                // Add the default 'edit-me' tag
-                if let Ok(tag) = Tag::new("edit-me") {
-                    frontmatter.add_tag(tag);
-                }
-                frontmatter.apply_to_content(&base_content)
-            };
-
-            content = open_editor(Some(&editor_content))?;
-
-            // Check if the content is completely blank
-            if content.trim().is_empty() {
-                println!("Note is empty. Exiting without saving.");
-                return Err(NotelogError::EmptyContent);
-            }
-
-            // Check if content has frontmatter and validate it
-            match Note::from_str(&content) {
-                Ok(_) => {
-                    // Note is valid (either has valid frontmatter or no frontmatter)
-                    break;
-                }
-                Err(e) => {
-                    eprintln!("Error in YAML frontmatter: {}", e);
-
-                    // Save the user's content for the next iteration
-                    initial_content = Some(content.clone());
-
-                    // Wait for user to press Enter or Ctrl+C
-                    match wait_for_user_input() {
-                        Ok(true) => {
-                            // User pressed Enter, continue the loop to reopen the editor
-                            println!("Reopening editor to fix frontmatter...");
-                            continue;
-                        }
-                        _ => {
-                            // User pressed Ctrl+C or there was an error
-                            println!("Exiting without saving.");
-                            return Err(NotelogError::UserCancelled);
-                        }
-                    }
-                }
-            }
-        }
-
+        let content = create_note_from_editor(args.title.as_ref())?;
         content
     };
 
@@ -184,6 +94,105 @@ pub fn create_note_from_input(
 
     Ok((note, title_override))
 }
+
+/// Helper function to add a markdown header to content if a title is provided and content doesn't already have a header
+///
+/// Returns a tuple of (content, title_override) where:
+/// - content is the possibly modified content with a header
+/// - title_override is the title that was passed in, if any
+fn add_title_to_content(
+    content: String,
+    title: Option<&String>,
+    tags: &[Tag],
+) -> Result<(Note, Option<String>)> {
+    if let Some(title) = title {
+        // Check if the content already has a markdown header
+        if !content.trim_start().starts_with('#') {
+            return Ok((
+                Note::new(
+                    Frontmatter::with_tags(tags.to_vec()),
+                    format!("# {}\n\n{}", title, content),
+                ),
+                Some(title.clone()),
+            ));
+        }
+    }
+
+    // No title provided or content already has a header
+    Ok((
+        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
+        title.cloned(),
+    ))
+}
+
+/// Opens an editor for the user to create a note, with optional title
+///
+/// Handles the editor loop, validation, and user interaction for creating a note
+fn create_note_from_editor(title: Option<&String>) -> Result<String> {
+    let mut content;
+    let mut initial_content: Option<String> = None;
+
+    loop {
+        // For the first iteration, use the default initial content
+        // For subsequent iterations, use the user's content (even if it has invalid YAML)
+        let editor_content = if let Some(ref user_content) = initial_content {
+            user_content.clone()
+        } else {
+            let base_content = title
+                .map(|t| format!("# {}", t))
+                .unwrap_or_default();
+
+            // When opening the editor, add a default 'edit-me' tag.
+            // This makes it easier for users to add tags
+            let mut frontmatter = Frontmatter::default();
+
+            if let Ok(tag) = Tag::new("edit-me") {
+                frontmatter.add_tag(tag);
+            }
+
+            frontmatter.apply_to_content(&base_content)
+        };
+
+        content = open_editor(Some(&editor_content))?;
+
+        // Check if the content is completely blank
+        if content.trim().is_empty() {
+            println!("Note is empty. Exiting without saving.");
+            return Err(NotelogError::EmptyContent);
+        }
+
+        // Check if content has frontmatter and validate it
+        match Note::from_str(&content) {
+            Ok(_) => {
+                // Note is valid (either has valid frontmatter or no frontmatter)
+                break;
+            }
+            Err(e) => {
+                eprintln!("Error in YAML frontmatter: {}", e);
+
+                // Save the user's content for the next iteration
+                initial_content = Some(content.clone());
+
+                // Wait for user to press Enter or Ctrl+C
+                match wait_for_user_input() {
+                    Ok(true) => {
+                        // User pressed Enter, continue the loop to reopen the editor
+                        println!("Reopening editor to fix frontmatter...");
+                        continue;
+                    }
+                    _ => {
+                        // User pressed Ctrl+C or there was an error
+                        println!("Exiting without saving.");
+                        return Err(NotelogError::UserCancelled);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(content)
+}
+
 
 #[cfg(test)]
 mod tests {
