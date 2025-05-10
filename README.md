@@ -37,7 +37,7 @@ notelog foo bar baz --title 'Metasyntactic variables'
 echo "Lorem ipsum" | notelog
 
 # Add a note with a specific notes directory
-notelog -d ~/Notes add -t "Wellerman" There once was a ship
+notelog -d ~/Shanties add -t "Wellerman" There once was a ship
 
 # Opens an editor to capture a note
 notelog
