@@ -43,6 +43,26 @@ notelog -d ~/Notes add -t "Wellerman" There once was a ship
 notelog
 ```
 
+### Notes Directory
+
+NOTE: You will need to create the notes directory yourself before using Notelog.
+
+By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable. 
+
+The notes directory is organized as follows:
+
+```
+~/NoteLog/
+├── 2025/
+│   ├── 01_January/
+│   │   ├── 2025-01-01T17-45 First note.md
+│   │   └── 2025-01-02T12-34 Second note.md
+│   ├── 02_February/
+│   │   └── ...
+│   └── ...
+└── ...
+```
+
 ### Model Context Protocol Server
 
 When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
@@ -78,20 +98,3 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 | Tool Name | Description |
 |-----------|-------------|
 | add_note  | Add a new note to your NoteLog directory |
-
-### Notes Directory
-
-By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable. You will need to create the directory yourself before using Notelog.
-
-The notes directory is organized as follows:
-```
-~/NoteLog/
-├── 2025/
-│   ├── 01_January/
-│   │   ├── 2025-01-01T17-45 First note.md
-│   │   └── 2025-01-02T12-34 Second note.md
-│   ├── 02_February/
-│   │   └── ...
-│   └── ...
-└── ...
-```
