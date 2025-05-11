@@ -2,7 +2,7 @@
 
 use chrono::Local;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::core::frontmatter::Frontmatter;
@@ -79,8 +79,8 @@ impl Note {
 
     /// Save the note to disk in the appropriate directory
     ///
-    /// Returns the path to the saved note file
-    pub fn save(&self, notes_dir: &Path, title_override: Option<&str>) -> Result<String> {
+    /// Returns the path to the saved note file, relative to the notes_dir
+    pub fn save(&self, notes_dir: &Path, title_override: Option<&str>) -> Result<PathBuf> {
         // Get the current date and time
         let now = Local::now();
 
@@ -111,11 +111,16 @@ impl Note {
         let final_content = self.to_string();
 
         // Write the note to the file
-        let note_path = month_dir.join(&filename);
-        fs::write(&note_path, final_content)?;
+        let absolute_note_path = month_dir.join(&filename);
+        fs::write(&absolute_note_path, final_content)?;
 
-        // Return the path as a string
-        Ok(note_path.to_string_lossy().to_string())
+        // Convert the absolute path to a path relative to notes_dir
+        let relative_path = absolute_note_path.strip_prefix(notes_dir)
+            .map_err(|e| NotelogError::PathError(format!("Failed to create relative path: {}", e)))?
+            .to_path_buf();
+
+        // Return the relative path
+        Ok(relative_path)
     }
 }
 
@@ -256,12 +261,15 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify the file was created
-        let path = result.unwrap();
-        let path = Path::new(&path);
-        assert!(path.exists());
+        let relative_path = result.unwrap();
+        let absolute_path = notes_dir.join(&relative_path);
+        assert!(absolute_path.exists());
+
+        // Verify the path is relative (doesn't start with the temp_dir path)
+        assert!(!relative_path.is_absolute());
 
         // Verify the content
-        let saved_content = fs::read_to_string(path).unwrap();
+        let saved_content = fs::read_to_string(absolute_path).unwrap();
         assert!(saved_content.contains("# Test Save"));
         assert!(saved_content.contains("This is a test of the save method."));
         // Empty tags array should be omitted
@@ -283,13 +291,19 @@ mod tests {
         let result = note.save(notes_dir, Some("Custom Title"));
         assert!(result.is_ok());
 
+        // Get the relative path
+        let relative_path = result.unwrap();
+
+        // Verify the path is relative (doesn't start with the temp_dir path)
+        assert!(!relative_path.is_absolute());
+
         // Verify the file was created with the custom title in the filename
-        let path = result.unwrap();
-        assert!(path.contains("Custom Title"));
+        let path_str = relative_path.to_string_lossy();
+        assert!(path_str.contains("Custom Title"));
 
         // Verify the content still has the original title
-        let path = Path::new(&path);
-        let saved_content = fs::read_to_string(path).unwrap();
+        let absolute_path = notes_dir.join(&relative_path);
+        let saved_content = fs::read_to_string(absolute_path).unwrap();
         assert!(saved_content.contains("# Original Title"));
     }
 }

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::cli::AddArgs;
@@ -10,19 +10,20 @@ use crate::utils::{open_editor, read_file_content, validate_content, wait_for_us
 
 /// Create a note from various input sources and save it
 ///
-/// Returns the path to the created note file on success
-pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Result<String> {
+/// Returns the path to the created note file on success (relative to notes_dir)
+pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Result<PathBuf> {
     // Create a note from the input
     let (note, title_override) = create_note_from_input(args, stdin_content)?;
 
     // Save the note to disk
-    let note_path = note.save(notes_dir, title_override.as_deref())?;
+    let relative_path = note.save(notes_dir, title_override.as_deref())?;
 
-    // Print success message
-    println!("Note saved to: {}", note_path);
+    // Print success message with absolute path for user convenience
+    let absolute_path = notes_dir.join(&relative_path);
+    println!("Note saved to: {}", absolute_path.display());
 
-    // Return the path
-    Ok(note_path)
+    // Return the relative path
+    Ok(relative_path)
 }
 
 /// Create a Note object from various input sources

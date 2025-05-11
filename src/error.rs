@@ -70,6 +70,9 @@ pub enum NotelogError {
 
     #[error("Operation cancelled by user")]
     UserCancelled,
+
+    #[error("Path error: {0}")]
+    PathError(String),
 }
 
 pub type Result<T> = std::result::Result<T, NotelogError>;

@@ -80,10 +80,13 @@ impl AddNote {
 
         // Save the note
         match note.save(&self.notes_dir, None) {
-            Ok(note_path) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Note added successfully: {}",
-                note_path
-            ))])),
+            Ok(relative_path) => {
+                // Return the relative path as the success message
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "Note added successfully: {}",
+                    relative_path.display()
+                ))]))
+            },
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                 "Error: {}",
                 e
