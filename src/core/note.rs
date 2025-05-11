@@ -64,6 +64,11 @@ impl Note {
             title = title.strip_prefix("* ").unwrap_or(&title).trim().to_string();
         }
 
+        // Remove any trailing periods (so we don't end up with "Title..md")
+        while title.ends_with('.') {
+            title.pop();
+        }
+
         // Truncate to 100 characters maximum
         if title.len() > 100 {
             title.truncate(100);
@@ -214,10 +219,25 @@ mod tests {
         // Long title truncation
         let long_title = "A".repeat(150);
         let content = format!("# {}\nThis is the content", long_title);
-        let note = Note::new(frontmatter, content);
+        let note = Note::new(frontmatter.clone(), content);
         let extracted = note.extract_title();
         assert_eq!(extracted.len(), 100);
         assert_eq!(extracted, "A".repeat(100));
+
+        // Single trailing period
+        let content = "This title has a period.\nThis is the content";
+        let note = Note::new(frontmatter.clone(), content.to_string());
+        assert_eq!(note.extract_title(), "This title has a period");
+
+        // Multiple trailing periods
+        let content = "This title has multiple periods...\nThis is the content";
+        let note = Note::new(frontmatter.clone(), content.to_string());
+        assert_eq!(note.extract_title(), "This title has multiple periods");
+
+        // Trailing period with markdown header
+        let content = "# This is a header with period.\nThis is the content";
+        let note = Note::new(frontmatter, content.to_string());
+        assert_eq!(note.extract_title(), "This is a header with period");
     }
 
     #[test]
