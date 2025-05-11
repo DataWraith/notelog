@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.1.2'></a>
+# 0.1.2 — 2025-05-11
+
+## Changed
+
+- Trailing periods are now stripped from titles to prevent filenames like "Title..md"
+
+- The MCP server no longer returns the full path to the saved note to avoid leaking more information than is necessary to the LLM.
+
 <a id='changelog-0.1.1'></a>
 # 0.1.1 — 2025-05-09
 
