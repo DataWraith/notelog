@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.2.0'></a>
+# 0.2.0 — 2025-05-12
+
+## Added
+
+- New MCP server tool: `search_by_tags`
+
+- `fetch_note` tool that allows the LLM to retrieve a note by its ID. IDs are returned by the `search_by_tags`-tool.
+
 <a id='changelog-0.1.2'></a>
 # 0.1.2 — 2025-05-11
 
