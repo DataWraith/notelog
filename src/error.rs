@@ -24,6 +24,22 @@ pub enum FrontmatterError {
     InvalidTimestamp(String),
 }
 
+/// Specific error type for database operations
+#[derive(Error, Debug)]
+pub enum DatabaseError {
+    #[error("Database connection error: {0}")]
+    ConnectionError(String),
+
+    #[error("Database migration error: {0}")]
+    MigrationError(String),
+
+    #[error("Database query error: {0}")]
+    QueryError(String),
+
+    #[error("Database serialization error: {0}")]
+    SerializationError(String),
+}
+
 #[derive(Error, Debug)]
 pub enum NotelogError {
     #[error("IO error: {0}")]
@@ -67,6 +83,9 @@ pub enum NotelogError {
 
     #[error("Frontmatter validation error: {0}")]
     FrontmatterError(#[from] FrontmatterError),
+
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] DatabaseError),
 
     #[error("Operation cancelled by user")]
     UserCancelled,

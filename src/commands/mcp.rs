@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::cli::McpArgs;
+use crate::db::Database;
 use crate::error::{NotelogError, Result};
 use crate::mcp::{self, AddNote};
 
@@ -11,8 +12,21 @@ pub fn mcp_command(notes_dir: &Path, args: McpArgs) -> Result<()> {
         return Err(NotelogError::InvalidMcpOptions);
     }
 
-    // Create a new AddNote handler with the notes directory
-    let handler = AddNote::new(notes_dir);
+    // Create a new tokio runtime for database initialization
+    let rt = mcp::create_runtime()?;
+
+    // Initialize the database
+    let db = rt.block_on(async {
+        let db = Database::initialize(notes_dir).await?;
+
+        // Start the background task to index notes
+        db.start_indexing_task().await?;
+
+        Ok::<_, NotelogError>(db)
+    })?;
+
+    // Create a new AddNote handler with the notes directory and database
+    let handler = AddNote::with_db(notes_dir, db);
 
     // Run the MCP server with the handler
     match mcp::run_mcp_server(handler) {

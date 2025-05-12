@@ -1,10 +1,11 @@
 //! Tag implementation for notelog
 
 use crate::error::{NotelogError, Result, TagError};
+use serde::Serialize;
 use std::fmt;
 
 /// An opaque wrapper type that represents a valid tag
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Tag(String);
 
 impl Tag {

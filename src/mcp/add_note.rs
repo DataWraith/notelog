@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use rmcp::{
     Error as McpError, ServerHandler,
@@ -9,6 +10,7 @@ use rmcp::{
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
 use crate::core::tags::Tag;
+use crate::db::Database;
 
 /// Request structure for the AddNote tool
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -30,6 +32,8 @@ pub struct AddNoteRequest {
 pub struct AddNote {
     /// The directory where notes will be stored
     notes_dir: PathBuf,
+    /// The database connection (optional)
+    db: Option<Arc<Database>>,
 }
 
 impl AddNote {
@@ -37,6 +41,15 @@ impl AddNote {
     pub fn new<P: AsRef<Path>>(notes_dir: P) -> Self {
         Self {
             notes_dir: notes_dir.as_ref().to_path_buf(),
+            db: None,
+        }
+    }
+
+    /// Create a new AddNote handler with the specified notes directory and database
+    pub fn with_db<P: AsRef<Path>>(notes_dir: P, db: Database) -> Self {
+        Self {
+            notes_dir: notes_dir.as_ref().to_path_buf(),
+            db: Some(Arc::new(db)),
         }
     }
 }
@@ -119,5 +132,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let add_note = AddNote::new(temp_dir.path());
         assert_eq!(add_note.notes_dir, temp_dir.path());
+        assert!(add_note.db.is_none());
     }
 }

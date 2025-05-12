@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod core;
+mod db;
 mod error;
 mod mcp;
 mod utils;
