@@ -4,13 +4,14 @@ CREATE TABLE notes (
     filepath TEXT UNIQUE NOT NULL,
     mtime TEXT NOT NULL,
     metadata TEXT NOT NULL,
-    content TEXT NOT NULL,
+    content TEXT NOT NULL
 );
 
 -- Table for storing unique tags
 CREATE TABLE tags (
     tag_id INTEGER PRIMARY KEY,
-    tag_name TEXT UNIQUE
+    tag_name TEXT UNIQUE,
+    usage_count INTEGER DEFAULT 0
 );
 
 -- Junction table for the many-to-many relationship
