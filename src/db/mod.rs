@@ -82,9 +82,31 @@ impl Database {
     /// Search for notes by tags
     ///
     /// Returns a list of notes that have all the specified tags.
-    pub async fn search_by_tags(&self, tags: &[&str]) -> Result<Vec<String>> {
+    ///
+    /// # Parameters
+    ///
+    /// * `tags` - A slice of tag strings to search for
+    /// * `before` - Optional DateTime to filter notes created before this time
+    /// * `after` - Optional DateTime to filter notes created after this time
+    ///
+    /// If both `before` and `after` are provided and `before` is less than `after`,
+    /// an empty result will be returned as this represents a non-overlapping date range.
+    pub async fn search_by_tags(
+        &self,
+        tags: &[&str],
+        before: Option<chrono::DateTime<chrono::Local>>,
+        after: Option<chrono::DateTime<chrono::Local>>,
+    ) -> Result<Vec<String>> {
         if tags.is_empty() {
             return Ok(Vec::new());
+        }
+
+        // Check for non-overlapping date range
+        if let (Some(before_date), Some(after_date)) = (before.as_ref(), after.as_ref()) {
+            if before_date < after_date {
+                // Non-overlapping date range, return empty result
+                return Ok(Vec::new());
+            }
         }
 
         // Build the SQL query dynamically based on the number of tags
@@ -103,6 +125,27 @@ impl Database {
         // Complete the query to group by note_id and ensure all tags are present
         query.push_str(") GROUP BY n.id HAVING COUNT(DISTINCT t.tag_name) = ?");
 
+        // Add date range conditions if provided
+        if before.is_some() || after.is_some() {
+            query.push_str(" AND n.id IN (SELECT id FROM notes WHERE ");
+
+            let mut conditions_added = false;
+
+            if let Some(_) = before {
+                query.push_str("json_extract(metadata, '$.created') <= ?");
+                conditions_added = true;
+            }
+
+            if let Some(_) = after {
+                if conditions_added {
+                    query.push_str(" AND ");
+                }
+                query.push_str("json_extract(metadata, '$.created') >= ?");
+            }
+
+            query.push_str(")");
+        }
+
         // Create a query builder
         let mut query_builder = sqlx::query_scalar::<_, String>(&query);
 
@@ -113,6 +156,19 @@ impl Database {
 
         // Bind the count parameter (number of tags)
         query_builder = query_builder.bind(tags.len() as i64);
+
+        // Bind date parameters if provided
+        if let Some(before_date) = before {
+            // Format the date as ISO8601 string with the same format used in frontmatter
+            let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            query_builder = query_builder.bind(before_str);
+        }
+
+        if let Some(after_date) = after {
+            // Format the date as ISO8601 string with the same format used in frontmatter
+            let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            query_builder = query_builder.bind(after_str);
+        }
 
         // Execute the query
         let filepaths = query_builder
