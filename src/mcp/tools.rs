@@ -40,14 +40,14 @@ pub struct SearchByTagsRequest {
 
     /// Optional date to filter notes created before this time (ISO8601 format)
     #[schemars(
-        description = "Optional date to filter notes created before this time (ISO8601 format, e.g., '2025-05-01T12:00:00Z')"
+        description = "Optional date to select only notes created before this time (ISO8601 format, e.g., '2025-05-01T12:00:00Z')"
     )]
     #[serde(default)]
     pub before: Option<String>,
 
     /// Optional date to filter notes created after this time (ISO8601 format)
     #[schemars(
-        description = "Optional date to filter notes created after this time (ISO8601 format, e.g., '2025-04-01T12:00:00Z')"
+        description = "Optional date to select only notes created after this time (ISO8601 format, e.g., '2025-04-01T12:00:00Z')"
     )]
     #[serde(default)]
     pub after: Option<String>,
