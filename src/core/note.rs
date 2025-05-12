@@ -1,6 +1,7 @@
 //! Note implementation for notelog
 
 use chrono::Local;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -37,8 +38,8 @@ impl Note {
         &self.content
     }
 
-    /// Convert the note to a string with frontmatter and content
-    pub fn to_string(&self) -> String {
+    /// Get the formatted content with frontmatter
+    pub fn formatted_content(&self) -> String {
         format!("{}\n\n{}\n\n", self.frontmatter, self.content.trim_end())
     }
 
@@ -116,7 +117,7 @@ impl Note {
         }
 
         // Get the full content with frontmatter
-        let final_content = self.to_string();
+        let final_content = self.formatted_content();
 
         // Write the note to the file
         let absolute_note_path = month_dir.join(&filename);
@@ -130,6 +131,12 @@ impl Note {
 
         // Return the relative path
         Ok(relative_path)
+    }
+}
+
+impl fmt::Display for Note {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.formatted_content())
     }
 }
 

@@ -1,6 +1,5 @@
 //! Indexing functionality for the database
 
-use chrono;
 use rmcp::serde_json;
 use sqlx::{Pool, Sqlite};
 use std::path::{Path, PathBuf};
@@ -87,7 +86,7 @@ async fn collect_note_files_with_channel(
             continue;
         }
 
-        if path.extension().map_or(false, |ext| ext == "md") {
+        if path.extension().is_some_and(|ext| ext == "md") {
             // Only include Markdown files that start with a '1' or '2' in order to
             // filter out any non-note files, such as README.md or monthly rollups.
             //

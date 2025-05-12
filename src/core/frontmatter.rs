@@ -43,6 +43,7 @@ impl Frontmatter {
     }
 
     /// Get the creation timestamp
+    #[allow(dead_code)]
     pub fn created(&self) -> &DateTime<Local> {
         &self.created
     }

@@ -66,8 +66,7 @@ pub fn create_note_from_input(
         return add_title_to_content(content, args.title.as_ref(), &tags);
     } else {
         // Open an editor with frontmatter and any provided tags
-        let content = create_note_from_editor(args.title.as_ref(), &tags)?;
-        content
+        create_note_from_editor(args.title.as_ref(), &tags)?
     };
 
     validate_content(content.as_bytes())?;

@@ -6,10 +6,8 @@ mod error;
 mod mcp;
 mod utils;
 
-use std::io::{self, Read};
-
-use atty;
 use clap::Parser;
+use std::io::{self, Read};
 
 use cli::{AddArgs, Cli, Commands};
 use error::Result;

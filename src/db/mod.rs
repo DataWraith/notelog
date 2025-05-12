@@ -5,11 +5,7 @@ mod indexing;
 mod tests;
 
 // Re-export indexing functions
-pub use indexing::{
-    delete_notes_by_filepaths, get_all_note_filepaths, index_notes_with_channel, process_note_file,
-};
-
-use chrono;
+pub use indexing::{index_notes_with_channel, process_note_file};
 use rmcp::serde_json;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
@@ -139,19 +135,19 @@ impl Database {
 
             let mut conditions_added = false;
 
-            if let Some(_) = before {
+            if before.is_some() {
                 count_query.push_str("json_extract(metadata, '$.created') <= ?");
                 conditions_added = true;
             }
 
-            if let Some(_) = after {
+            if after.is_some() {
                 if conditions_added {
                     count_query.push_str(" AND ");
                 }
                 count_query.push_str("json_extract(metadata, '$.created') >= ?");
             }
 
-            count_query.push_str(")");
+            count_query.push(')');
         }
 
         // Create the count query string
@@ -209,19 +205,19 @@ impl Database {
 
             let mut conditions_added = false;
 
-            if let Some(_) = before {
+            if before.is_some() {
                 query.push_str("json_extract(metadata, '$.created') <= ?");
                 conditions_added = true;
             }
 
-            if let Some(_) = after {
+            if after.is_some() {
                 if conditions_added {
                     query.push_str(" AND ");
                 }
                 query.push_str("json_extract(metadata, '$.created') >= ?");
             }
 
-            query.push_str(")");
+            query.push(')');
         }
 
         // Add ORDER BY and LIMIT clauses
