@@ -25,4 +25,4 @@ This will find all notes that have both the "project" and "important" tags, crea
 
 The response will be a JSON object mapping note IDs to titles, limited to 25 results.
 
-When displaying the results, prefix each note title with its id: `[id] title`, so the user can refer to an individual note by its ID.
+When displaying the results, create a Markdown list. Each line should display both the `id`, and the `title`, e.g. `* [{id}] {title}`.
