@@ -84,7 +84,7 @@ async fn collect_note_files_with_channel(
         if metadata.is_dir() {
             // Process subdirectories recursively using Box::pin to avoid infinite size
             Box::pin(collect_note_files_with_channel(&path, tx.clone())).await?;
-            return Ok(());
+            continue;
         }
 
         if path.extension().map_or(false, |ext| ext == "md") {
