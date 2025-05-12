@@ -9,7 +9,7 @@ use crate::core::tags::Tag;
 use crate::error::{FrontmatterError, NotelogError, Result};
 
 /// Represents the frontmatter of a note
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Frontmatter {
     /// The creation timestamp
     created: DateTime<Local>,

@@ -5,11 +5,15 @@ mod indexing;
 mod tests;
 
 // Re-export indexing functions
-pub use indexing::{delete_notes_by_filepaths, get_all_note_filepaths, index_notes_with_channel};
+pub use indexing::index_notes_with_channel;
 
 use chrono;
+use rmcp::serde_json;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
+
+use crate::core::frontmatter::Frontmatter;
+use crate::core::note::Note;
 
 use crate::error::{DatabaseError, Result};
 
@@ -81,13 +85,14 @@ impl Database {
 
     /// Search for notes by tags
     ///
-    /// Returns a list of notes that have all the specified tags.
+    /// Returns a BTreeMap of note IDs to Notes that have all the specified tags.
     ///
     /// # Parameters
     ///
     /// * `tags` - A slice of tag strings to search for
     /// * `before` - Optional DateTime to filter notes created before this time
     /// * `after` - Optional DateTime to filter notes created after this time
+    /// * `limit` - Optional limit on the number of results to return
     ///
     /// If both `before` and `after` are provided and `before` is less than `after`,
     /// an empty result will be returned as this represents a non-overlapping date range.
@@ -96,22 +101,93 @@ impl Database {
         tags: &[&str],
         before: Option<chrono::DateTime<chrono::Local>>,
         after: Option<chrono::DateTime<chrono::Local>>,
-    ) -> Result<Vec<String>> {
+        limit: Option<usize>,
+    ) -> Result<(std::collections::BTreeMap<i64, Note>, usize)> {
         if tags.is_empty() {
-            return Ok(Vec::new());
+            return Ok((std::collections::BTreeMap::new(), 0));
         }
 
         // Check for non-overlapping date range
         if let (Some(before_date), Some(after_date)) = (before.as_ref(), after.as_ref()) {
             if before_date < after_date {
                 // Non-overlapping date range, return empty result
-                return Ok(Vec::new());
+                return Ok((std::collections::BTreeMap::new(), 0));
             }
         }
 
+        // First, get the total count of matching notes
+        let mut count_query = String::from(
+            "SELECT COUNT(DISTINCT n.id) FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
+        );
+
+        // Add placeholders for each tag
+        for (i, _) in tags.iter().enumerate() {
+            if i > 0 {
+                count_query.push_str(", ");
+            }
+            count_query.push('?');
+        }
+
+        // Complete the query to group by note_id and ensure all tags are present
+        count_query.push_str(") GROUP BY n.id HAVING COUNT(DISTINCT t.tag_name) = ?");
+
+        // Add date range conditions if provided
+        if before.is_some() || after.is_some() {
+            count_query.push_str(" AND n.id IN (SELECT id FROM notes WHERE ");
+
+            let mut conditions_added = false;
+
+            if let Some(_) = before {
+                count_query.push_str("json_extract(metadata, '$.created') <= ?");
+                conditions_added = true;
+            }
+
+            if let Some(_) = after {
+                if conditions_added {
+                    count_query.push_str(" AND ");
+                }
+                count_query.push_str("json_extract(metadata, '$.created') >= ?");
+            }
+
+            count_query.push_str(")");
+        }
+
+        // Create the count query string
+        let count_query_str = format!("SELECT COUNT(*) FROM ({}) as count_query", count_query);
+
+        // Create a query builder for the count
+        let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query_str);
+
+        // Bind each tag parameter for the count query
+        for tag in tags {
+            count_query_builder = count_query_builder.bind(tag);
+        }
+
+        // Bind the count parameter (number of tags) for the count query
+        count_query_builder = count_query_builder.bind(tags.len() as i64);
+
+        // Bind date parameters if provided for the count query
+        if let Some(before_date) = before {
+            // Format the date as ISO8601 string with the same format used in frontmatter
+            let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            count_query_builder = count_query_builder.bind(before_str);
+        }
+
+        if let Some(after_date) = after {
+            // Format the date as ISO8601 string with the same format used in frontmatter
+            let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            count_query_builder = count_query_builder.bind(after_str);
+        }
+
+        // Execute the count query
+        let total_count = count_query_builder
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
         // Build the SQL query dynamically based on the number of tags
         let mut query = String::from(
-            "SELECT n.filepath FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
+            "SELECT n.id, n.metadata, n.content FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
         );
 
         // Add placeholders for each tag
@@ -146,8 +222,15 @@ impl Database {
             query.push_str(")");
         }
 
+        // Add ORDER BY and LIMIT clauses
+        query.push_str(" ORDER BY json_extract(n.metadata, '$.created') DESC");
+
+        if let Some(limit_val) = limit {
+            query.push_str(&format!(" LIMIT {}", limit_val));
+        }
+
         // Create a query builder
-        let mut query_builder = sqlx::query_scalar::<_, String>(&query);
+        let mut query_builder = sqlx::query_as::<_, (i64, String, String)>(&query);
 
         // Bind each tag parameter
         for tag in tags {
@@ -171,11 +254,25 @@ impl Database {
         }
 
         // Execute the query
-        let filepaths = query_builder
+        let notes_data = query_builder
             .fetch_all(&self.pool)
             .await
             .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        Ok(filepaths)
+        // Convert the results to a BTreeMap of id => Note
+        let mut notes = std::collections::BTreeMap::new();
+        for (id, metadata_json, content) in notes_data {
+            // Parse the frontmatter from the metadata JSON
+            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
+                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+
+            // Create a Note from the frontmatter and content
+            let note = Note::new(frontmatter, content);
+
+            // Add the note to the map
+            notes.insert(id, note);
+        }
+
+        Ok((notes, total_count as usize))
     }
 }

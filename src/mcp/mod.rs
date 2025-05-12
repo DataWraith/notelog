@@ -1,8 +1,8 @@
 //! MCP (Model Context Protocol) implementation for notelog
 
-mod add_note;
+mod tools;
 
-pub use add_note::AddNote;
+pub use tools::NotelogMCP;
 
 use tokio::runtime::Runtime;
 
@@ -21,7 +21,7 @@ pub fn run_mcp_server_with_db<P: AsRef<std::path::Path>>(
     notes_dir: P,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::db::Database;
-    use crate::mcp::AddNote;
+    use crate::mcp::NotelogMCP;
 
     let rt = create_runtime()?;
 
@@ -36,8 +36,8 @@ pub fn run_mcp_server_with_db<P: AsRef<std::path::Path>>(
             .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        // Create the AddNote handler with the database
-        let handler = AddNote::with_db(notes_dir, db);
+        // Create the NotelogMCP handler with the database
+        let handler = NotelogMCP::with_db(notes_dir, db);
 
         use rmcp::ServiceExt;
         use tokio::io::{stdin, stdout};

@@ -47,7 +47,7 @@ notelog
 
 NOTE: You will need to create the notes directory yourself before using Notelog.
 
-By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable. 
+By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable.
 
 The notes directory is organized as follows:
 
@@ -93,8 +93,15 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 }
 ```
 
-#### Available Tools 
+#### Available Tools
 
 | Tool Name | Description |
 |-----------|-------------|
 | add_note  | Add a new note to your NoteLog directory |
+| search_by_tags | Search for notes that match specific tags |
+
+You can search for notes by asking the LLM:
+
+- `Find notes with tag +project`
+- `Search for notes about programming from last month`
+- `Show me notes with tags +important and +urgent`

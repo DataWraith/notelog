@@ -1,6 +1,6 @@
 # NoteLog
 
-This server allows you to record Markdown notes with tags.
+This server allows you to record and search Markdown notes with tags.
 
 ## Creating Notes
 
@@ -21,3 +21,17 @@ If the user does not supply verbatim note content in quotation marks, give them 
 
 - If the user asks you to add a note, but does not specify tags, choose 2-3 tags that are relevant to the content of the note.
 - Prefer tags that don't already appear in the note content as words.
+
+## Searching Notes
+
+Use the `search_by_tags` tool to find notes that match specific tags. The user might ask:
+- "Find notes with tag X"
+- "Search for notes about X"
+- "Show me notes with tags X and Y"
+- "What notes do I have about X from last month?"
+
+When searching:
+1. Convert the user's request into appropriate tags
+2. Use date filters (`before` and `after`) when the user specifies a time range
+3. Present the results in a clear format, showing the titles of the found notes
+4. If there are many results, suggest adding more specific tags to narrow the search
