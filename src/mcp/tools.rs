@@ -58,24 +58,16 @@ pub struct SearchByTagsRequest {
 pub struct NotelogMCP {
     /// The directory where notes will be stored
     notes_dir: PathBuf,
-    /// The database connection (optional)
-    db: Option<Arc<Database>>,
+    /// The database connection (required)
+    db: Arc<Database>,
 }
 
 impl NotelogMCP {
-    /// Create a new NotelogMCP handler with the specified notes directory
-    pub fn new<P: AsRef<Path>>(notes_dir: P) -> Self {
-        Self {
-            notes_dir: notes_dir.as_ref().to_path_buf(),
-            db: None,
-        }
-    }
-
     /// Create a new NotelogMCP handler with the specified notes directory and database
     pub fn with_db<P: AsRef<Path>>(notes_dir: P, db: Database) -> Self {
         Self {
             notes_dir: notes_dir.as_ref().to_path_buf(),
-            db: Some(Arc::new(db)),
+            db: Arc::new(db),
         }
     }
 }
@@ -120,23 +112,27 @@ impl NotelogMCP {
         // Save the note
         match note.save(&self.notes_dir, None) {
             Ok(relative_path) => {
-                // If database is available, add the note to the database
-                if let Some(db) = &self.db {
-                    // Get the absolute path to the note file
-                    let absolute_path = self.notes_dir.join(&relative_path);
+                // Get the absolute path to the note file
+                let absolute_path = self.notes_dir.join(&relative_path);
 
-                    // Process the note file to add it to the database
-                    // We use tokio::task::block_in_place since process_note_file is an async function
-                    // but add_note is not async
-                    if let Err(e) = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            crate::db::process_note_file(db.pool(), &self.notes_dir, &absolute_path)
-                                .await
-                        })
-                    }) {
-                        // Log the error but don't fail the operation since the note was saved to disk
-                        eprintln!("Error adding note to database: {}", e);
-                    }
+                // Process the note file to add it to the database
+                // We use tokio::task::block_in_place since process_note_file is an async function
+                // but add_note is not async
+                if let Err(e) = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        crate::db::process_note_file(
+                            self.db.pool(),
+                            &self.notes_dir,
+                            &absolute_path,
+                        )
+                        .await
+                    })
+                }) {
+                    // Return an error if the note couldn't be added to the database
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Error adding note to database: {}",
+                        e
+                    ))]));
                 }
 
                 // Return the relative path as the success message
@@ -158,15 +154,8 @@ impl NotelogMCP {
         &self,
         #[tool(aggr)] request: SearchByTagsRequest,
     ) -> Result<CallToolResult, McpError> {
-        // Check if database is available
-        let db = match &self.db {
-            Some(db) => db,
-            None => {
-                return Ok(CallToolResult::error(vec![Content::text(
-                    "Database is not available. Please run the server with database support.",
-                )]));
-            }
-        };
+        // Database is now always available
+        let db = &self.db;
 
         // Validate that tags are provided
         if request.tags.is_empty() {
@@ -287,12 +276,26 @@ impl ServerHandler for NotelogMCP {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use tokio::runtime::Runtime;
 
     #[test]
-    fn test_notelog_mcp_new() {
+    fn test_notelog_mcp_with_db() {
         let temp_dir = TempDir::new().unwrap();
-        let notelog_mcp = NotelogMCP::new(temp_dir.path());
+
+        // Create a runtime for the test
+        let rt = Runtime::new().unwrap();
+
+        // Initialize the database in the runtime
+        let db = rt.block_on(async {
+            crate::db::Database::initialize(temp_dir.path())
+                .await
+                .unwrap()
+        });
+
+        // Create the NotelogMCP with the database
+        let notelog_mcp = NotelogMCP::with_db(temp_dir.path(), db);
+
+        // Verify the notes_dir is set correctly
         assert_eq!(notelog_mcp.notes_dir, temp_dir.path());
-        assert!(notelog_mcp.db.is_none());
     }
 }
