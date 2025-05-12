@@ -99,7 +99,7 @@ impl AddNote {
                     "Note added successfully: {}",
                     relative_path.display()
                 ))]))
-            },
+            }
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                 "Error: {}",
                 e

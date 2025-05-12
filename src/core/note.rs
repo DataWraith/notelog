@@ -59,9 +59,17 @@ impl Note {
         if title.starts_with('#') {
             title = title.trim_start_matches('#').trim().to_string();
         } else if title.starts_with("- ") {
-            title = title.strip_prefix("- ").unwrap_or(&title).trim().to_string();
+            title = title
+                .strip_prefix("- ")
+                .unwrap_or(&title)
+                .trim()
+                .to_string();
         } else if title.starts_with("* ") {
-            title = title.strip_prefix("* ").unwrap_or(&title).trim().to_string();
+            title = title
+                .strip_prefix("* ")
+                .unwrap_or(&title)
+                .trim()
+                .to_string();
         }
 
         // Remove any trailing periods (so we don't end up with "Title..md")
@@ -115,7 +123,8 @@ impl Note {
         fs::write(&absolute_note_path, final_content)?;
 
         // Convert the absolute path to a path relative to notes_dir
-        let relative_path = absolute_note_path.strip_prefix(notes_dir)
+        let relative_path = absolute_note_path
+            .strip_prefix(notes_dir)
             .map_err(|e| NotelogError::PathError(format!("Failed to create relative path: {}", e)))?
             .to_path_buf();
 

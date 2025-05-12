@@ -3,11 +3,11 @@
 #[cfg(test)]
 mod tests;
 
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 use chrono;
 use rmcp::serde_json;
-use sqlx::{migrate::MigrateDatabase, Pool, Sqlite, SqlitePool};
+use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use tokio::fs;
 
 use crate::core::note::Note;
@@ -64,9 +64,9 @@ impl Database {
         let pool = self.pool.clone();
         let notes_dir = self.notes_dir.clone();
 
-        // Spawn a background task to index notes
+        // Spawn a background task to index notes using channels
         tokio::spawn(async move {
-            if let Err(e) = index_notes(pool, &notes_dir).await {
+            if let Err(e) = index_notes_with_channel(pool, &notes_dir).await {
                 eprintln!("Error indexing notes: {}", e);
             }
         });
@@ -89,7 +89,7 @@ impl Database {
 
         // Build the SQL query dynamically based on the number of tags
         let mut query = String::from(
-            "SELECT n.filepath FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN ("
+            "SELECT n.filepath FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
         );
 
         // Add placeholders for each tag
@@ -124,59 +124,72 @@ impl Database {
     }
 }
 
-/// Index all notes in the notes directory
-async fn index_notes(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
-    // Get all note files in the notes directory
-    let mut note_files = collect_note_files(notes_dir).await?;
+/// Index all notes in the notes directory using channels
+async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
+    // Create a channel for sending file paths
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<PathBuf>(100);
 
-    // Sort in reverse alphabetical order so newer notes are processed first
-    note_files.sort_by(|a, b| b.cmp(a));
+    // Spawn a task to collect note files and send them to the channel
+    let notes_dir_clone = notes_dir.to_path_buf();
+    let collector_task = tokio::spawn(async move {
+        if let Err(e) = collect_note_files_with_channel(&notes_dir_clone, tx).await {
+            eprintln!("Error collecting note files: {}", e);
+        }
+    });
 
-    // Process each note file
-    for file_path in note_files {
-        if let Err(e) = process_note_file(&pool, notes_dir, &file_path).await {
+    // Process notes as they arrive through the channel
+    let pool_clone = pool.clone();
+    let notes_dir_clone = notes_dir.to_path_buf();
+
+    // Process files as they come in
+    while let Some(file_path) = rx.recv().await {
+        if let Err(e) = process_note_file(&pool_clone, &notes_dir_clone, &file_path).await {
             eprintln!("Error processing note file {}: {}", file_path.display(), e);
         }
+    }
+
+    // Wait for the collector task to complete
+    if let Err(e) = collector_task.await {
+        eprintln!("Error in collector task: {}", e);
     }
 
     Ok(())
 }
 
-/// Collect all note files in the notes directory
-async fn collect_note_files(notes_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut note_files = Vec::new();
-    collect_note_files_recursive(notes_dir, &mut note_files).await?;
-    Ok(note_files)
-}
+/// Collect note files and send them to a channel
+async fn collect_note_files_with_channel(
+    notes_dir: &Path,
+    tx: tokio::sync::mpsc::Sender<PathBuf>,
+) -> Result<()> {
+    // Process the current directory
+    let mut entries = fs::read_dir(notes_dir).await?;
 
-/// Recursively collect all note files in a directory
-async fn collect_note_files_recursive(dir: &Path, note_files: &mut Vec<PathBuf>) -> Result<()> {
-    let mut entries = fs::read_dir(dir).await?;
-
+    // First, collect all entries at this level
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         let metadata = fs::metadata(&path).await?;
 
         if metadata.is_dir() {
-            // Skip the database file
-            if path.file_name().map_or(false, |name| name == DB_FILENAME) {
-                continue;
-            }
+            // Process subdirectories recursively using Box::pin to avoid infinite size
+            Box::pin(collect_note_files_with_channel(&path, tx.clone())).await?;
+            return Ok(());
+        }
 
-            // Recursively process subdirectories using Box::pin to avoid infinite size
-            Box::pin(collect_note_files_recursive(&path, note_files)).await?;
-        } else if path.extension().map_or(false, |ext| ext == "md") {
-            // Only include markdown files that start with a date pattern (e.g., "2025-05-11T12-34 ...")
+        if path.extension().map_or(false, |ext| ext == "md") {
+            // Only include markdown files that start with a date pattern
             if let Some(filename) = path.file_name() {
                 let filename_str = filename.to_string_lossy();
                 // Check if the filename starts with a date pattern (YYYY-MM-DDT)
-                if filename_str.len() > 10 &&
-                   filename_str.starts_with(|c: char| c.is_ascii_digit()) &&
-                   filename_str[4..5] == *"-" &&
-                   filename_str[7..8] == *"-" &&
-                   filename_str[10..11] == *"T" {
-                    // Add markdown files that match the date pattern to the list
-                    note_files.push(path);
+                if filename_str.len() > 10
+                    && filename_str.starts_with(|c: char| c.is_ascii_digit())
+                    && filename_str[4..5] == *"-"
+                    && filename_str[7..8] == *"-"
+                    && filename_str[10..11] == *"T"
+                {
+                    // Send Markdown files that match the date pattern to the channel
+                    if let Err(e) = tx.send(path).await {
+                        eprintln!("Error sending file path to channel: {}", e);
+                    }
                 }
             }
         }
@@ -203,13 +216,12 @@ async fn process_note_file(pool: &Pool<Sqlite>, notes_dir: &Path, file_path: &Pa
         .to_string();
 
     // Check if the note already exists in the database with the same mtime
-    let existing = sqlx::query_as::<_, (i64, String)>(
-        "SELECT id, mtime FROM notes WHERE filepath = ?"
-    )
-    .bind(&relative_path)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let existing =
+        sqlx::query_as::<_, (i64, String)>("SELECT id, mtime FROM notes WHERE filepath = ?")
+            .bind(&relative_path)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     // If the note exists and has the same mtime, skip processing
     if let Some((_, db_mtime)) = &existing {
@@ -230,27 +242,23 @@ async fn process_note_file(pool: &Pool<Sqlite>, notes_dir: &Path, file_path: &Pa
 
     // Insert or update the note in the database
     if let Some((id, _)) = &existing {
-        sqlx::query(
-            "UPDATE notes SET mtime = ?, metadata = ?, content = ? WHERE id = ?"
-        )
-        .bind(&mtime_str)
-        .bind(&metadata_json)
-        .bind(note.content())
-        .bind(id)
-        .execute(pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        sqlx::query("UPDATE notes SET mtime = ?, metadata = ?, content = ? WHERE id = ?")
+            .bind(&mtime_str)
+            .bind(&metadata_json)
+            .bind(note.content())
+            .bind(id)
+            .execute(pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     } else {
-        sqlx::query(
-            "INSERT INTO notes (filepath, mtime, metadata, content) VALUES (?, ?, ?, ?)"
-        )
-        .bind(&relative_path)
-        .bind(&mtime_str)
-        .bind(&metadata_json)
-        .bind(note.content())
-        .execute(pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        sqlx::query("INSERT INTO notes (filepath, mtime, metadata, content) VALUES (?, ?, ?, ?)")
+            .bind(&relative_path)
+            .bind(&mtime_str)
+            .bind(&metadata_json)
+            .bind(note.content())
+            .execute(pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
     Ok(())

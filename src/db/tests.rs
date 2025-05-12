@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::db::{Database, DB_FILENAME, index_notes};
     use crate::core::frontmatter::Frontmatter;
     use crate::core::note::Note;
     use crate::core::tags::Tag;
+    use crate::db::{DB_FILENAME, Database, index_notes_with_channel};
     use std::fs;
     use tempfile::TempDir;
     use tokio::runtime::Runtime;
@@ -18,9 +18,7 @@ mod tests {
         let rt = Runtime::new().unwrap();
 
         // Initialize the database
-        let _db = rt.block_on(async {
-            Database::initialize(notes_dir).await.unwrap()
-        });
+        let _db = rt.block_on(async { Database::initialize(notes_dir).await.unwrap() });
 
         // Verify the database file was created
         let db_path = notes_dir.join(DB_FILENAME);
@@ -61,7 +59,9 @@ mod tests {
             let db = Database::initialize(notes_dir).await.unwrap();
 
             // Run the indexing task
-            index_notes(db.pool().clone(), notes_dir).await.unwrap();
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
 
             // Search for notes by tags
             let results = db.search_by_tags(&["test"]).await.unwrap();

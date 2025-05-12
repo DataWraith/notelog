@@ -198,7 +198,6 @@ fn create_note_from_editor(title: Option<&String>, tags: &[Tag]) -> Result<Strin
     Ok(content)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
