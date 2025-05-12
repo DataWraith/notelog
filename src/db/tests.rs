@@ -3,7 +3,11 @@ mod tests {
     use crate::core::frontmatter::Frontmatter;
     use crate::core::note::Note;
     use crate::core::tags::Tag;
-    use crate::db::{DB_FILENAME, Database, delete_notes_by_filepaths, get_all_note_filepaths, index_notes_with_channel};
+    use crate::db::{
+        DB_FILENAME, Database, delete_notes_by_filepaths, get_all_note_filepaths,
+        index_notes_with_channel,
+    };
+    use chrono::{Local, TimeZone};
     use std::fs;
     use tempfile::TempDir;
     use tokio::runtime::Runtime;
@@ -64,16 +68,22 @@ mod tests {
                 .unwrap();
 
             // Search for notes by tags
-            let results = db.search_by_tags(&["test"]).await.unwrap();
+            let results = db.search_by_tags(&["test"], None, None).await.unwrap();
             assert_eq!(results.len(), 1);
             assert_eq!(results[0], note_path.to_string_lossy());
 
             // Search for notes by multiple tags
-            let results = db.search_by_tags(&["test", "example"]).await.unwrap();
+            let results = db
+                .search_by_tags(&["test", "example"], None, None)
+                .await
+                .unwrap();
             assert_eq!(results.len(), 1);
 
             // Search for non-existent tag
-            let results = db.search_by_tags(&["nonexistent"]).await.unwrap();
+            let results = db
+                .search_by_tags(&["nonexistent"], None, None)
+                .await
+                .unwrap();
             assert_eq!(results.len(), 0);
         });
     }
@@ -147,11 +157,113 @@ mod tests {
 
             // Test direct deletion using delete_notes_by_filepaths
             let to_delete = vec![note_path2.to_string_lossy().to_string()];
-            delete_notes_by_filepaths(db.pool(), &to_delete).await.unwrap();
+            delete_notes_by_filepaths(db.pool(), &to_delete)
+                .await
+                .unwrap();
 
             // Verify no notes remain in the database
             let filepaths = get_all_note_filepaths(db.pool()).await.unwrap();
             assert_eq!(filepaths.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_search_by_tags_with_date_range() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a tokio runtime for testing
+        let rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            // Create year/month directories
+            let year_dir = notes_dir.join("2025");
+            let month_dir = year_dir.join("05");
+            fs::create_dir_all(&month_dir).unwrap();
+
+            // Create three test notes with different creation dates
+            // Note 1: Created 2025-05-01
+            let date1 = Local.with_ymd_and_hms(2025, 5, 1, 12, 0, 0).unwrap();
+            let mut frontmatter1 = Frontmatter::new(date1, vec![]);
+            let tag1 = Tag::new("test").unwrap();
+            frontmatter1.add_tag(tag1.clone());
+            let content1 = "# Test Note 1\nThis is the first test note.";
+            let note1 = Note::new(frontmatter1, content1.to_string());
+
+            // Note 2: Created 2025-05-15
+            let date2 = Local.with_ymd_and_hms(2025, 5, 15, 12, 0, 0).unwrap();
+            let mut frontmatter2 = Frontmatter::new(date2, vec![]);
+            frontmatter2.add_tag(tag1.clone());
+            let content2 = "# Test Note 2\nThis is the second test note.";
+            let note2 = Note::new(frontmatter2, content2.to_string());
+
+            // Note 3: Created 2025-05-30
+            let date3 = Local.with_ymd_and_hms(2025, 5, 30, 12, 0, 0).unwrap();
+            let mut frontmatter3 = Frontmatter::new(date3, vec![]);
+            frontmatter3.add_tag(tag1);
+            let content3 = "# Test Note 3\nThis is the third test note.";
+            let note3 = Note::new(frontmatter3, content3.to_string());
+
+            // Save the notes to disk
+            let note_path1 = note1.save(notes_dir, Some("Test Note 1")).unwrap();
+            let note_path2 = note2.save(notes_dir, Some("Test Note 2")).unwrap();
+            let note_path3 = note3.save(notes_dir, Some("Test Note 3")).unwrap();
+
+            // Initialize the database
+            let db = Database::initialize(notes_dir).await.unwrap();
+
+            // Run the indexing task
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
+
+            // Test 1: Search with no date filters (should return all 3 notes)
+            let results = db.search_by_tags(&["test"], None, None).await.unwrap();
+            assert_eq!(results.len(), 3);
+
+            // Test 2: Search for notes before 2025-05-20
+            let before_date = Local.with_ymd_and_hms(2025, 5, 20, 0, 0, 0).unwrap();
+            let results = db
+                .search_by_tags(&["test"], Some(before_date), None)
+                .await
+                .unwrap();
+            assert_eq!(results.len(), 2);
+            assert!(results.contains(&note_path1.to_string_lossy().to_string()));
+            assert!(results.contains(&note_path2.to_string_lossy().to_string()));
+            assert!(!results.contains(&note_path3.to_string_lossy().to_string()));
+
+            // Test 3: Search for notes after 2025-05-10
+            let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
+            let results = db
+                .search_by_tags(&["test"], None, Some(after_date))
+                .await
+                .unwrap();
+            assert_eq!(results.len(), 2);
+            assert!(!results.contains(&note_path1.to_string_lossy().to_string()));
+            assert!(results.contains(&note_path2.to_string_lossy().to_string()));
+            assert!(results.contains(&note_path3.to_string_lossy().to_string()));
+
+            // Test 4: Search with both before and after filters
+            let before_date = Local.with_ymd_and_hms(2025, 5, 25, 0, 0, 0).unwrap();
+            let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
+            let results = db
+                .search_by_tags(&["test"], Some(before_date), Some(after_date))
+                .await
+                .unwrap();
+            assert_eq!(results.len(), 1);
+            assert!(!results.contains(&note_path1.to_string_lossy().to_string()));
+            assert!(results.contains(&note_path2.to_string_lossy().to_string()));
+            assert!(!results.contains(&note_path3.to_string_lossy().to_string()));
+
+            // Test 5: Non-overlapping date range (before < after)
+            let before_date = Local.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap();
+            let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
+            let results = db
+                .search_by_tags(&["test"], Some(before_date), Some(after_date))
+                .await
+                .unwrap();
+            assert_eq!(results.len(), 0);
         });
     }
 }

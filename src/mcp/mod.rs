@@ -27,11 +27,13 @@ pub fn run_mcp_server_with_db<P: AsRef<std::path::Path>>(
 
     rt.block_on(async {
         // Initialize the database
-        let db = Database::initialize(notes_dir.as_ref()).await
+        let db = Database::initialize(notes_dir.as_ref())
+            .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
         // Start the background task to index notes
-        db.start_indexing_task().await
+        db.start_indexing_task()
+            .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
         // Create the AddNote handler with the database
