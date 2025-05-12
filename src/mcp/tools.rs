@@ -76,7 +76,7 @@ impl NotelogMCP {
 #[tool(tool_box)]
 impl NotelogMCP {
     /// Add a new note with the given content and tags
-    #[tool(description = include_str!("add_note_instructions.md"))]
+    #[tool(description = include_str!("instructions/add_note.md"))]
     fn add_note(&self, #[tool(aggr)] request: AddNoteRequest) -> Result<CallToolResult, McpError> {
         // Validate the number of tags
         if request.tags.len() > 10 {
@@ -149,7 +149,7 @@ impl NotelogMCP {
     }
 
     /// Search for notes by tags
-    #[tool(description = include_str!("search_by_tags_instructions.md"))]
+    #[tool(description = include_str!("instructions/search_by_tags.md"))]
     async fn search_by_tags(
         &self,
         #[tool(aggr)] request: SearchByTagsRequest,
@@ -262,7 +262,7 @@ impl NotelogMCP {
 #[tool(tool_box)]
 impl ServerHandler for NotelogMCP {
     fn get_info(&self) -> ServerInfo {
-        let instructions = include_str!("server_instructions.md");
+        let instructions = include_str!("instructions/server.md");
 
         ServerInfo {
             instructions: Some(instructions.into()),
