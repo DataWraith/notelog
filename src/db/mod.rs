@@ -5,6 +5,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use chrono;
 use rmcp::serde_json;
 use sqlx::{migrate::MigrateDatabase, Pool, Sqlite, SqlitePool};
 use tokio::fs;
@@ -178,7 +179,10 @@ async fn process_note_file(pool: &Pool<Sqlite>, notes_dir: &Path, file_path: &Pa
     // Get the file's modification time
     let metadata = fs::metadata(file_path).await?;
     let mtime = metadata.modified().unwrap_or(SystemTime::now());
-    let mtime_str = format!("{:?}", mtime);
+
+    // Convert SystemTime to DateTime<Local> and format as ISO8601 with millisecond precision
+    let datetime = chrono::DateTime::<chrono::Local>::from(mtime);
+    let mtime_str = datetime.format("%Y-%m-%d %H:%M:%S.%3f").to_string();
 
     // Get the relative path from the notes directory
     let relative_path = file_path
