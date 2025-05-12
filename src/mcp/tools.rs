@@ -280,7 +280,7 @@ impl NotelogMCP {
                 let mut id_to_title = BTreeMap::new();
                 for (id, note) in &notes {
                     let title = note.extract_title();
-                    id_to_title.insert(id.to_string(), title);
+                    id_to_title.insert(id, title);
                 }
 
                 // If there are no results, add a message
