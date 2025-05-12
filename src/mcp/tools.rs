@@ -283,24 +283,23 @@ impl NotelogMCP {
                     id_to_title.insert(id.to_string(), title);
                 }
 
-                // Convert the map to JSON
-                let json = serde_json::to_string(&id_to_title).unwrap_or_else(|_| "{}".to_string());
-
-                // Add a message if there are more results than the limit
-                let mut response = json;
-                if total_count > notes.len() {
-                    response.push_str(&format!(
-                        "\n\nNOTE: The query matches {} notes. Be more specific by adding more tags or limit the search using `before` and `after`.",
-                        total_count
-                    ));
-                }
-
                 // If there are no results, add a message
                 if notes.is_empty() {
-                    response = "{}\n\nNo results found. You may need to specify fewer tags or a larger date range.".to_string();
-                }
+                    "The query matched 0 notes.\n\nHint: You may need to specify fewer tags or a larger date range.".to_string()
+                } else {
+                    // Convert the map to JSON
+                    let json =
+                        serde_json::to_string(&id_to_title).unwrap_or_else(|_| "{}".to_string());
 
-                response
+                    // Add a message about the number of results
+                    let mut response = format!("The query matched {total_count} notes.\n\n{json}");
+
+                    if total_count > notes.len() {
+                        response.push_str("\n\nNOTE: The query matches too many notes. Be more specific by adding more tags or limit the search using `before` and `after`.");
+                    }
+
+                    response
+                }
             }
             Err(e) => {
                 return Ok(CallToolResult::error(vec![Content::text(format!(
