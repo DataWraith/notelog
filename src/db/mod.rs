@@ -166,8 +166,19 @@ async fn collect_note_files_recursive(dir: &Path, note_files: &mut Vec<PathBuf>)
             // Recursively process subdirectories using Box::pin to avoid infinite size
             Box::pin(collect_note_files_recursive(&path, note_files)).await?;
         } else if path.extension().map_or(false, |ext| ext == "md") {
-            // Add markdown files to the list
-            note_files.push(path);
+            // Only include markdown files that start with a date pattern (e.g., "2025-05-11T12-34 ...")
+            if let Some(filename) = path.file_name() {
+                let filename_str = filename.to_string_lossy();
+                // Check if the filename starts with a date pattern (YYYY-MM-DDT)
+                if filename_str.len() > 10 &&
+                   filename_str.starts_with(|c: char| c.is_ascii_digit()) &&
+                   filename_str[4..5] == *"-" &&
+                   filename_str[7..8] == *"-" &&
+                   filename_str[10..11] == *"T" {
+                    // Add markdown files that match the date pattern to the list
+                    note_files.push(path);
+                }
+            }
         }
     }
 
