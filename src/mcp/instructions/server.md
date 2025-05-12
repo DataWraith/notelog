@@ -7,9 +7,8 @@ This server allows you to record and search Markdown notes with tags.
 Use the `add_note` tool to create new notes in order to capture the user's thoughts, todos, accomplishments, etc. or summarize the conversation history.
 
 - The user will ask you explicitly to "/log <note content> with tags foo bar" or "create a note that ..." or 'Add a notelog: "..."'.
-- You can also offer to save summaries of, or insights from, the current conversation when appropriate (e.g. when a decision is reached or some task is accomplished).
-
-If the user does not supply verbatim note content in quotation marks, give them a preview of the content you want to add as a note and have them confirm it before invoking `add_note`.
+- Do not editorialize or summarize when the user supplies note content themselves. You may still add a title and tags when appropriate.
+- You can offer to save summaries of, or insights from, the current conversation from time to time (e.g. when a decision is reached or some task is accomplished).
 
 ### Title
 
