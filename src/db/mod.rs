@@ -126,6 +126,12 @@ impl Database {
 
 /// Index all notes in the notes directory using channels
 async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
+    // First, get all existing note filepaths from the database
+    let existing_filepaths = get_all_note_filepaths(&pool).await?;
+
+    // Create a HashSet to track which notes still exist on disk
+    let mut filepaths_to_delete = existing_filepaths.into_iter().collect::<std::collections::HashSet<String>>();
+
     // Create a channel for sending file paths
     let (tx, mut rx) = tokio::sync::mpsc::channel::<PathBuf>(100);
 
@@ -143,14 +149,32 @@ async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> Resul
 
     // Process files as they come in
     while let Some(file_path) = rx.recv().await {
-        if let Err(e) = process_note_file(&pool_clone, &notes_dir_clone, &file_path).await {
-            eprintln!("Error processing note file {}: {}", file_path.display(), e);
+        // Get the relative path from the notes directory
+        if let Ok(relative_path) = file_path
+            .strip_prefix(&notes_dir_clone)
+            .map(|p| p.to_string_lossy().to_string()) {
+
+            // Remove this filepath from the set of files to delete
+            filepaths_to_delete.remove(&relative_path);
+
+            // Process the note file
+            if let Err(e) = process_note_file(&pool_clone, &notes_dir_clone, &file_path).await {
+                eprintln!("Error processing note file {}: {}", file_path.display(), e);
+            }
         }
     }
 
     // Wait for the collector task to complete
     if let Err(e) = collector_task.await {
         eprintln!("Error in collector task: {}", e);
+    }
+
+    // Delete notes that no longer exist on disk
+    if !filepaths_to_delete.is_empty() {
+        let filepaths_vec: Vec<String> = filepaths_to_delete.into_iter().collect();
+        if let Err(e) = delete_notes_by_filepaths(&pool, &filepaths_vec).await {
+            eprintln!("Error deleting notes from database: {}", e);
+        }
     }
 
     Ok(())
@@ -194,6 +218,42 @@ async fn collect_note_files_with_channel(
             }
         }
     }
+
+    Ok(())
+}
+
+/// Get all note filepaths from the database
+async fn get_all_note_filepaths(pool: &Pool<Sqlite>) -> Result<Vec<String>> {
+    let filepaths = sqlx::query_scalar::<_, String>("SELECT filepath FROM notes")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+    Ok(filepaths)
+}
+
+/// Delete notes from the database by their filepaths
+async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]) -> Result<()> {
+    // Use a transaction to ensure all deletions are atomic
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+    for filepath in filepaths {
+        // The after_note_delete trigger will handle removing tag relationships
+        // and updating tag usage counts
+        sqlx::query("DELETE FROM notes WHERE filepath = ?")
+            .bind(filepath)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    }
+
+    // Commit the transaction
+    tx.commit()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     Ok(())
 }

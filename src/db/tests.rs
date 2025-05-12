@@ -3,7 +3,7 @@ mod tests {
     use crate::core::frontmatter::Frontmatter;
     use crate::core::note::Note;
     use crate::core::tags::Tag;
-    use crate::db::{DB_FILENAME, Database, index_notes_with_channel};
+    use crate::db::{DB_FILENAME, Database, delete_notes_by_filepaths, get_all_note_filepaths, index_notes_with_channel};
     use std::fs;
     use tempfile::TempDir;
     use tokio::runtime::Runtime;
@@ -75,6 +75,83 @@ mod tests {
             // Search for non-existent tag
             let results = db.search_by_tags(&["nonexistent"]).await.unwrap();
             assert_eq!(results.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_note_deletion() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a tokio runtime for testing
+        let rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            // Create year/month directories
+            let year_dir = notes_dir.join("2025");
+            let month_dir = year_dir.join("05");
+            fs::create_dir_all(&month_dir).unwrap();
+
+            // Create two test notes with tags
+            let mut frontmatter1 = Frontmatter::default();
+            let tag1 = Tag::new("test").unwrap();
+            let tag2 = Tag::new("example").unwrap();
+            frontmatter1.add_tag(tag1.clone());
+            frontmatter1.add_tag(tag2.clone());
+
+            let content1 = "# Test Note 1\nThis is the first test note.";
+            let note1 = Note::new(frontmatter1, content1.to_string());
+
+            let mut frontmatter2 = Frontmatter::default();
+            frontmatter2.add_tag(tag1);
+            frontmatter2.add_tag(tag2);
+
+            let content2 = "# Test Note 2\nThis is the second test note.";
+            let note2 = Note::new(frontmatter2, content2.to_string());
+
+            // Save the notes to disk
+            let note_path1 = note1.save(notes_dir, Some("Test Note 1")).unwrap();
+            let note_path2 = note2.save(notes_dir, Some("Test Note 2")).unwrap();
+
+            assert!(notes_dir.join(&note_path1).exists());
+            assert!(notes_dir.join(&note_path2).exists());
+
+            // Initialize the database
+            let db = Database::initialize(notes_dir).await.unwrap();
+
+            // Run the indexing task
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
+
+            // Verify both notes are in the database
+            let filepaths = get_all_note_filepaths(db.pool()).await.unwrap();
+            assert_eq!(filepaths.len(), 2);
+            assert!(filepaths.contains(&note_path1.to_string_lossy().to_string()));
+            assert!(filepaths.contains(&note_path2.to_string_lossy().to_string()));
+
+            // Delete the first note from disk
+            fs::remove_file(notes_dir.join(&note_path1)).unwrap();
+
+            // Run the indexing task again
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
+
+            // Verify only the second note remains in the database
+            let filepaths = get_all_note_filepaths(db.pool()).await.unwrap();
+            assert_eq!(filepaths.len(), 1);
+            assert!(!filepaths.contains(&note_path1.to_string_lossy().to_string()));
+            assert!(filepaths.contains(&note_path2.to_string_lossy().to_string()));
+
+            // Test direct deletion using delete_notes_by_filepaths
+            let to_delete = vec![note_path2.to_string_lossy().to_string()];
+            delete_notes_by_filepaths(db.pool(), &to_delete).await.unwrap();
+
+            // Verify no notes remain in the database
+            let filepaths = get_all_note_filepaths(db.pool()).await.unwrap();
+            assert_eq!(filepaths.len(), 0);
         });
     }
 }
