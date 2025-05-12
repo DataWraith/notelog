@@ -200,16 +200,16 @@ async fn collect_note_files_with_channel(
         }
 
         if path.extension().map_or(false, |ext| ext == "md") {
-            // Only include markdown files that start with a date pattern
+            // Only include Markdown files that start with a '1' or '2' in order to
+            // filter out any non-note files, such as README.md or monthly rollups.
+            //
+            // NOTE: This assumes the program won't be used for notes in the year 3000.
+            //
+            // We could use a RegEx or something here, but this is a simple check that
+            // should be good enough for now.
             if let Some(filename) = path.file_name() {
                 let filename_str = filename.to_string_lossy();
-                // Check if the filename starts with a date pattern (YYYY-MM-DDT)
-                if filename_str.len() > 10
-                    && filename_str.starts_with(|c: char| c.is_ascii_digit())
-                    && filename_str[4..5] == *"-"
-                    && filename_str[7..8] == *"-"
-                    && filename_str[10..11] == *"T"
-                {
+                if filename_str.starts_with('1') || filename_str.starts_with('2') {
                     // Send Markdown files that match the date pattern to the channel
                     if let Err(e) = tx.send(path).await {
                         eprintln!("Error sending file path to channel: {}", e);
