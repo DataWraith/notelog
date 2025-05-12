@@ -24,3 +24,5 @@ Example:
 This will find all notes that have both the "project" and "important" tags, created between April 1st and May 1st, 2025.
 
 The response will be a JSON object mapping note IDs to titles, limited to 25 results.
+
+When displaying the results, prefix each note title with its id: `[id] title`, so the user can refer to an individual note by its ID.
