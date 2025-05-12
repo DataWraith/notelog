@@ -81,6 +81,34 @@ impl Database {
         &self.pool
     }
 
+    /// Fetch a note by its ID
+    ///
+    /// Returns the note if found, or None if no note with the given ID exists.
+    pub async fn fetch_note_by_id(&self, id: i64) -> Result<Option<Note>> {
+        // Query the database for the note with the given ID
+        let note_data = sqlx::query_as::<_, (String, String)>(
+            "SELECT metadata, content FROM notes WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // If no note was found, return None
+        if let Some((metadata_json, content)) = note_data {
+            // Parse the frontmatter from the metadata JSON
+            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
+                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+
+            // Create a Note from the frontmatter and content
+            let note = Note::new(frontmatter, content);
+
+            Ok(Some(note))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Search for notes by tags
     ///
     /// Returns a BTreeMap of note IDs to Notes that have all the specified tags.

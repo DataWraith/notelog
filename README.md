@@ -60,7 +60,7 @@ The notes directory is organized as follows:
 │   ├── 02_February/
 │   │   └── ...
 │   └── ...
-├── .notes.db 
+├── .notes.db
 └── ...
 ```
 
@@ -104,6 +104,7 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 |-----------|-------------|
 | add_note  | Add a new note to your NoteLog directory |
 | search_by_tags | Search for notes that match specific tags |
+| fetch_note | Retrieve a specific note by its ID |
 
 You can search for notes by asking the LLM:
 

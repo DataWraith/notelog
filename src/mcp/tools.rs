@@ -29,6 +29,14 @@ pub struct AddNoteRequest {
     pub tags: Vec<String>,
 }
 
+/// Request structure for the FetchNote tool
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct FetchNoteRequest {
+    /// The ID of the note to fetch
+    #[schemars(description = "The ID of the note to fetch (integer)")]
+    pub id: i64,
+}
+
 /// Request structure for the SearchByTags tool
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct SearchByTagsRequest {
@@ -145,6 +153,54 @@ impl NotelogMCP {
                 "Error: {}",
                 e
             ))])),
+        }
+    }
+
+    /// Fetch a note by its ID
+    #[tool(description = include_str!("instructions/fetch_note.md"))]
+    async fn fetch_note(
+        &self,
+        #[tool(aggr)] request: FetchNoteRequest,
+    ) -> Result<CallToolResult, McpError> {
+        // Database is now always available
+        let db = &self.db;
+
+        // Fetch the note by ID
+        match db.fetch_note_by_id(request.id).await {
+            Ok(Some(note)) => {
+                // Extract tags from the note
+                let tags: Vec<String> = note
+                    .frontmatter()
+                    .tags()
+                    .iter()
+                    .map(|tag| tag.as_str().to_string())
+                    .collect();
+
+                // Create a response object with tags and content
+                let response = serde_json::json!({
+                    "tags": tags,
+                    "content": note.content()
+                });
+
+                // Convert to string
+                let json = serde_json::to_string_pretty(&response)
+                    .unwrap_or_else(|_| "Error serializing response".to_string());
+
+                Ok(CallToolResult::success(vec![Content::text(json)]))
+            }
+            Ok(None) => {
+                // Note not found
+                Ok(CallToolResult::success(vec![Content::text(
+                    "Note not found.",
+                )]))
+            }
+            Err(e) => {
+                // Error fetching note
+                Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error fetching note: {}",
+                    e
+                ))]))
+            }
         }
     }
 
