@@ -88,7 +88,7 @@ You can search for notes by tag (fulltext search is not yet supported):
 - `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
 
-To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs (for use with the `fetch_note` tool) will be returned.
+To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs will be returned. The LLM can then use these IDs to retrieve the note contents on request.
 
 #### JSON Configuration
 
