@@ -9,33 +9,51 @@ use sqlx::Sqlite;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 
 use crate::db::{is_valid_note_file, process_note_file};
 use crate::error::{DatabaseError, Result};
 
-/// File monitoring handler that processes file events
+/// File monitoring handler that sends events to a channel
 struct FileMonitoringHandler {
-    /// SQLite connection pool
-    pool: Pool<Sqlite>,
-    /// Path to the notes directory
-    notes_dir: PathBuf,
-    /// Mutex to prevent concurrent processing of the same file
-    processing: Arc<Mutex<()>>,
+    /// Channel sender for file events
+    sender: mpsc::UnboundedSender<Event>,
 }
 
 impl FileMonitoringHandler {
-    /// Create a new file monitoring handler
-    fn new(pool: Pool<Sqlite>, notes_dir: PathBuf) -> Self {
-        Self {
-            pool,
-            notes_dir,
-            processing: Arc::new(Mutex::new(())),
+    /// Create a new file monitoring handler with a channel sender
+    fn new(sender: mpsc::UnboundedSender<Event>) -> Self {
+        Self { sender }
+    }
+}
+
+impl EventHandler for FileMonitoringHandler {
+    /// Handle file events by sending them to the channel
+    fn handle_event(&mut self, result: NotifyResult<Event>) {
+        match result {
+            Ok(event) => {
+                // Send the event to the channel
+                if let Err(e) = self.sender.send(event) {
+                    eprintln!("Error sending file event to channel: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Error watching files: {}", e);
+            }
         }
     }
+}
 
-    /// Process a file event
-    async fn process_event(&self, event: Event) -> Result<()> {
+/// Process file events from the channel
+async fn process_events(
+    mut receiver: mpsc::UnboundedReceiver<Event>,
+    pool: Pool<Sqlite>,
+    notes_dir: PathBuf,
+) {
+    // Create a mutex to prevent concurrent processing of the same file
+    let processing = Arc::new(Mutex::new(()));
+
+    while let Some(event) = receiver.recv().await {
         // Only process events that are related to file modifications
         match event.kind {
             EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
@@ -49,11 +67,10 @@ impl FileMonitoringHandler {
                     // Check if the file is a valid note file
                     if is_valid_note_file(&path).await {
                         // Acquire the lock to prevent concurrent processing
-                        let _lock = self.processing.lock().await;
+                        let _lock = processing.lock().await;
 
                         // Process the note file
-                        if let Err(e) = process_note_file(&self.pool, &self.notes_dir, &path).await
-                        {
+                        if let Err(e) = process_note_file(&pool, &notes_dir, &path).await {
                             eprintln!("Error processing note file {}: {}", path.display(), e);
                         }
                     }
@@ -61,46 +78,16 @@ impl FileMonitoringHandler {
             }
             _ => {}
         }
-
-        Ok(())
-    }
-}
-
-impl EventHandler for FileMonitoringHandler {
-    /// Handle file events
-    fn handle_event(&mut self, result: NotifyResult<Event>) {
-        match result {
-            Ok(event) => {
-                // Process the event in a tokio task
-                let handler = self.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = handler.process_event(event).await {
-                        eprintln!("Error processing event: {}", e);
-                    }
-                });
-            }
-            Err(e) => {
-                eprintln!("Error watching files: {}", e);
-            }
-        }
-    }
-}
-
-// Implement Clone for FileMonitoringHandler
-impl Clone for FileMonitoringHandler {
-    fn clone(&self) -> Self {
-        Self {
-            pool: self.pool.clone(),
-            notes_dir: self.notes_dir.clone(),
-            processing: self.processing.clone(),
-        }
     }
 }
 
 /// Start a file monitoring task for the notes directory
 pub async fn start_file_monitoring(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
-    // Create a new file monitoring handler
-    let handler = FileMonitoringHandler::new(pool, notes_dir.to_path_buf());
+    // Create a channel for sending file events
+    let (sender, receiver) = mpsc::unbounded_channel();
+
+    // Create a new file monitoring handler with the sender
+    let handler = FileMonitoringHandler::new(sender);
 
     // Configure the watcher
     let config = Config::default()
@@ -115,6 +102,12 @@ pub async fn start_file_monitoring(pool: Pool<Sqlite>, notes_dir: &Path) -> Resu
     watcher
         .watch(notes_dir, RecursiveMode::Recursive)
         .map_err(|e| DatabaseError::MonitoringError(e.to_string()))?;
+
+    // Start a task to process events from the channel
+    let notes_dir_clone = notes_dir.to_path_buf();
+    tokio::spawn(async move {
+        process_events(receiver, pool, notes_dir_clone).await;
+    });
 
     // Keep the watcher alive by moving it into a tokio task
     tokio::spawn(async move {
