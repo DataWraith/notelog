@@ -20,7 +20,7 @@ No pre-built binaries are provided at this time. To install:
 
 ```bash
 # Add a note with content from command line arguments
-notelog add "This is a note"
+notelog add "This is a note" +example-tag
 
 # Add a note with a specific title
 notelog add --title "This is a note" "This is the content of the note"
