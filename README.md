@@ -69,6 +69,8 @@ Notelog maintains an SQLite database in the specified notes directory for use as
 
 When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
 
+#### Creating Notes
+
 You can create notes by just asking the LLM:
 
 - `/log Added Model Context Protocol support to Notelog +mcp +done`
@@ -77,6 +79,16 @@ You can create notes by just asking the LLM:
 - `Create a note about Topic X. Show me a preview before saving.`
 
 The default prompt instructs the LLM to automatically add tags and a title to the notes if you don't specify them.
+
+#### Searching for Notes
+
+You can search for notes by asking the LLM:
+
+- `Find notes with tag +project`
+- `Search for notes about programming from May 2025`
+- `How many notes tagged +todo do I have?`
+
+To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs (for use with the `fetch_note` tool) will be returned.
 
 #### JSON Configuration
 
@@ -94,19 +106,3 @@ The default prompt instructs the LLM to automatically add tags and a title to th
   }
 }
 ```
-
-#### Available Tools
-
-| Tool Name | Description |
-|-----------|-------------|
-| add_note  | Add a new note to your NoteLog directory |
-| search_by_tags | Search for notes that match specific tags |
-| fetch_note | Retrieve a specific note by its ID |
-
-You can search for notes by asking the LLM:
-
-- `Find notes with tag +project`
-- `Search for notes about programming from May 2025`
-- `How many notes tagged +todo do I have?`
-
-To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs (for use with the `fetch_note` tool) will be returned.
