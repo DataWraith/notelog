@@ -59,6 +59,13 @@ pub struct SearchByTagsRequest {
     )]
     #[serde(default)]
     pub after: Option<String>,
+
+    /// Optional limit on the number of results to return (max 25, default 10)
+    #[schemars(
+        description = "Optional limit on the number of results to return (max 25, default 10). Set to 0 to only return the count of matching notes without their content."
+    )]
+    #[serde(default)]
+    pub limit: Option<usize>,
 }
 
 /// NotelogMCP tools for interacting with notes via MCP
@@ -273,20 +280,36 @@ impl NotelogMCP {
         // Convert tags to string slices for the database query
         let tag_strs: Vec<&str> = tags.iter().map(|s| s.as_str()).collect();
 
-        // Search for notes with the specified tags
-        let result = match db.search_by_tags(&tag_strs, before, after, Some(25)).await {
-            Ok((notes, total_count)) => {
-                // Create a map of note ID to title
-                let mut id_to_title = BTreeMap::new();
-                for (id, note) in &notes {
-                    let title = note.extract_title();
-                    id_to_title.insert(id, title);
-                }
+        // Get the limit parameter, with default of 10 if not specified
+        let query_limit = request.limit.unwrap_or(10);
 
-                // If there are no results, add a message
-                if notes.is_empty() {
+        // Validate the limit parameter
+        if query_limit > 25 {
+            return Ok(CallToolResult::error(vec![Content::text(
+                "Limit cannot exceed 25. Please specify a lower limit.",
+            )]));
+        }
+
+        // Search for notes with the specified tags
+        let result = match db
+            .search_by_tags(&tag_strs, before, after, Some(query_limit))
+            .await
+        {
+            Ok((notes, total_count)) => {
+                // If limit is 0, only return the count
+                if query_limit == 0 {
+                    format!("The query matched {total_count} notes.")
+                } else if notes.is_empty() {
+                    // If there are no results, add a message
                     "The query matched 0 notes.\n\nHint: You may need to specify fewer tags or a larger date range.".to_string()
                 } else {
+                    // Create a map of note ID to title
+                    let mut id_to_title = BTreeMap::new();
+                    for (id, note) in &notes {
+                        let title = note.extract_title();
+                        id_to_title.insert(id, title);
+                    }
+
                     // Convert the map to JSON
                     let json =
                         serde_json::to_string(&id_to_title).unwrap_or_else(|_| "{}".to_string());
@@ -294,7 +317,7 @@ impl NotelogMCP {
                     // Add a message about the number of results
                     let mut response = format!("The query matched {total_count} notes.\n\n{json}");
 
-                    if total_count > notes.len() {
+                    if total_count > 25 {
                         response.push_str("\n\nNOTE: The query matches too many notes. Be more specific by adding more tags or limit the search using `before` and `after`.");
                     }
 

@@ -214,6 +214,12 @@ impl Database {
             .await
             .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
+        if let Some(limit) = limit {
+            if limit == 0 {
+                return Ok((std::collections::BTreeMap::new(), total_count as usize));
+            }
+        }
+
         // Build the SQL query dynamically based on the number of tags
         let mut query = String::from(
             "SELECT n.id, n.metadata, n.content FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
