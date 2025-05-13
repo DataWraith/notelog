@@ -1,7 +1,5 @@
 # Notelog
 
-[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
-
 **Status**: This is an early prototype of a personal tool. Use at your own risk.
 
 
