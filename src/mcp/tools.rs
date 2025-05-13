@@ -9,6 +9,7 @@ use rmcp::{
     schemars, serde_json, tool,
 };
 
+use crate::constants::{DEFAULT_SEARCH_RESULTS, MAX_SEARCH_RESULTS};
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
 use crate::core::tags::Tag;
@@ -60,7 +61,7 @@ pub struct SearchByTagsRequest {
     #[serde(default)]
     pub after: Option<String>,
 
-    /// Optional limit on the number of results to return (max 25, default 10)
+    /// Optional limit on the number of results to return (max MAX_SEARCH_RESULTS, default DEFAULT_SEARCH_RESULTS)
     #[schemars(
         description = "Optional limit on the number of results to return (max 25, default 10). Set to 0 to only return the count of matching notes without their content."
     )]
@@ -280,14 +281,15 @@ impl NotelogMCP {
         // Convert tags to string slices for the database query
         let tag_strs: Vec<&str> = tags.iter().map(|s| s.as_str()).collect();
 
-        // Get the limit parameter, with default of 10 if not specified
-        let query_limit = request.limit.unwrap_or(10);
+        // Get the limit parameter, with default of DEFAULT_SEARCH_RESULTS if not specified
+        let query_limit = request.limit.unwrap_or(DEFAULT_SEARCH_RESULTS);
 
         // Validate the limit parameter
-        if query_limit > 25 {
-            return Ok(CallToolResult::error(vec![Content::text(
-                "Limit cannot exceed 25. Please specify a lower limit.",
-            )]));
+        if query_limit > MAX_SEARCH_RESULTS {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "Limit cannot exceed {}. Please specify a lower limit.",
+                MAX_SEARCH_RESULTS
+            ))]));
         }
 
         // Search for notes with the specified tags
@@ -317,7 +319,7 @@ impl NotelogMCP {
                     // Add a message about the number of results
                     let mut response = format!("The query matched {total_count} notes.\n\n{json}");
 
-                    if total_count > 25 {
+                    if total_count > MAX_SEARCH_RESULTS {
                         response.push_str("\n\nNOTE: The query matches too many notes. Be more specific by adding more tags or limit the search using `before` and `after`.");
                     }
 

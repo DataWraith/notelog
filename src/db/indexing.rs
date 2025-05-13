@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio::fs;
 
+use crate::constants::MAX_FILE_SIZE_BYTES;
+
 use crate::core::note::Note;
 use crate::error::{DatabaseError, NotelogError, Result};
 
@@ -34,11 +36,10 @@ async fn is_valid_note_file(path: &Path) -> bool {
         return false;
     }
 
-    // Check file size (must be less than 50 KiB)
+    // Check file size (must be less than MAX_FILE_SIZE_BYTES)
     if let Ok(metadata) = fs::metadata(path).await {
         let file_size = metadata.len();
-        if file_size > 50 * 1024 {
-            // 50 KiB in bytes
+        if file_size > MAX_FILE_SIZE_BYTES as u64 {
             return false;
         }
     } else {

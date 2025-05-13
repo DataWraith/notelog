@@ -8,6 +8,7 @@ use chrono::{DateTime, Datelike, Local};
 use dirs::home_dir;
 use tempfile::NamedTempFile;
 
+use crate::constants::MAX_FILE_SIZE_BYTES;
 use crate::error::{NotelogError, Result};
 
 /// Determine the notes directory from the provided path, environment variable, or default
@@ -101,8 +102,8 @@ pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<us
 
 /// Check if content is valid
 pub fn validate_content(content: &[u8]) -> Result<()> {
-    // Check if content is too large (> 50KiB)
-    if content.len() > 50 * 1024 {
+    // Check if content is too large (> MAX_FILE_SIZE_BYTES)
+    if content.len() > MAX_FILE_SIZE_BYTES {
         return Err(NotelogError::ContentTooLarge);
     }
 
@@ -235,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_validate_content_too_large() {
-        let content = vec![b'a'; 51 * 1024]; // 51KiB
+        let content = vec![b'a'; MAX_FILE_SIZE_BYTES + 1024]; // MAX_FILE_SIZE_BYTES + 1KiB
         assert!(matches!(
             validate_content(&content),
             Err(NotelogError::ContentTooLarge)

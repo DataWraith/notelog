@@ -1,6 +1,8 @@
 use std::io;
 use thiserror::Error;
 
+use crate::constants::MAX_FILE_SIZE_KIB;
+
 /// Specific error type for tag validation errors
 #[derive(Error, Debug)]
 pub enum TagError {
@@ -54,7 +56,7 @@ pub enum NotelogError {
     #[error("Note content is empty")]
     EmptyContent,
 
-    #[error("Note content is too large (> 50KiB)")]
+    #[error("Note content is too large (> {MAX_FILE_SIZE_KIB}KiB)")]
     ContentTooLarge,
 
     #[error("Note content contains null bytes")]
