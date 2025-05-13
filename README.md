@@ -65,9 +65,7 @@ The notes directory is organized as follows:
 └── ...
 ```
 
-Notelog keeps an SQLite database in the notes directory that serves as a search index.
-
-The database is updated when adding notes through the MCP server, but not when you add or edit notes manually or through the CLI, so you may need to restart the MCP server to see added or changed notes.
+Notelog maintains an SQLite database in the specified notes directory for use as a search index. Notes are monitored for changes and synchronized with the database automatically.
 
 ### Model Context Protocol Server
 
