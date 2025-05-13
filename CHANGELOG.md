@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.3.0'></a>
+# 0.3.0 — 2025-05-13
+
+## Added
+
+- Monitoring of the NoteLog directory to detect new/modified/deleted files
+
+## Changed
+
+- The `search_by_tags` MCP tool can now return the number of search results independently from the search results themselves
+- The `search_by_tags` MCP tool can now ask for between 1 and 25 search results to be returned
+
 <a id='changelog-0.2.0'></a>
 # 0.2.0 — 2025-05-12
 
