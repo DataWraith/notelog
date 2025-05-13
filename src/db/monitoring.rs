@@ -91,7 +91,7 @@ pub async fn start_file_monitoring(pool: Pool<Sqlite>, notes_dir: &Path) -> Resu
 
     // Configure the watcher
     let config = Config::default()
-        .with_poll_interval(Duration::from_secs(2))
+        .with_poll_interval(Duration::from_secs(20))
         .with_compare_contents(false); // No need to compare contents, we check mtime in process_note_file
 
     // Create a watcher with the handler
