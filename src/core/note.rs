@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use crate::core::frontmatter::Frontmatter;
 use crate::error::{NotelogError, Result};
-use crate::utils::{create_date_directories, generate_filename};
+use crate::utils::{create_date_directories, generate_filename, validate_content};
 
 /// Represents a complete note with frontmatter and content
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,6 +144,9 @@ impl FromStr for Note {
     type Err = NotelogError;
 
     fn from_str(s: &str) -> Result<Self> {
+        // First validate the content
+        validate_content(s.as_bytes())?;
+
         // Use Frontmatter::extract_from_content to parse the frontmatter
         match Frontmatter::extract_from_content(s) {
             Ok((Some(frontmatter), content)) => {
