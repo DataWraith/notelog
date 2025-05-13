@@ -45,7 +45,8 @@ notelog
 
 ### Notes Directory
 
-NOTE: You will need to create the notes directory yourself before using Notelog.
+> [!IMPORTANT]  
+> You will need to create the notes directory yourself before using Notelog.
 
 By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable.
 
