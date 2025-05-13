@@ -9,6 +9,46 @@ use tokio::fs;
 use crate::core::note::Note;
 use crate::error::{DatabaseError, NotelogError, Result};
 
+/// Check if a file path is a valid note file
+///
+/// A valid note file must:
+/// - Have a .md extension
+/// - Have a filename that starts with '1' or '2' (for year 1xxx or 2xxx)
+///   to filter out non-note files like README.md or monthly rollups
+/// - Be less than 50 KiB in size
+async fn is_valid_note_file(path: &Path) -> bool {
+    // Check if it's a markdown file
+    if !path.extension().is_some_and(|ext| ext == "md") {
+        return false;
+    }
+
+    // Check if the filename starts with a date pattern
+    if let Some(filename) = path.file_name() {
+        let filename_str = filename.to_string_lossy();
+        // Only include files that start with '1' or '2' (for year 1xxx or 2xxx)
+        // This assumes the program won't be used for notes in the year 3000
+        if !filename_str.starts_with('1') && !filename_str.starts_with('2') {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    // Check file size (must be less than 50 KiB)
+    if let Ok(metadata) = fs::metadata(path).await {
+        let file_size = metadata.len();
+        if file_size > 50 * 1024 {
+            // 50 KiB in bytes
+            return false;
+        }
+    } else {
+        // If we can't get the metadata, consider it invalid
+        return false;
+    }
+
+    true
+}
+
 /// Index all notes in the notes directory using channels
 pub async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
     // First, get all existing note filepaths from the database
@@ -86,22 +126,10 @@ async fn collect_note_files_with_channel(
             continue;
         }
 
-        if path.extension().is_some_and(|ext| ext == "md") {
-            // Only include Markdown files that start with a '1' or '2' in order to
-            // filter out any non-note files, such as README.md or monthly rollups.
-            //
-            // NOTE: This assumes the program won't be used for notes in the year 3000.
-            //
-            // We could use a RegEx or something here, but this is a simple check that
-            // should be good enough for now.
-            if let Some(filename) = path.file_name() {
-                let filename_str = filename.to_string_lossy();
-                if filename_str.starts_with('1') || filename_str.starts_with('2') {
-                    // Send Markdown files that match the date pattern to the channel
-                    if let Err(e) = tx.send(path).await {
-                        eprintln!("Error sending file path to channel: {}", e);
-                    }
-                }
+        if is_valid_note_file(&path).await {
+            // Send valid note files to the channel
+            if let Err(e) = tx.send(path).await {
+                eprintln!("Error sending file path to channel: {}", e);
             }
         }
     }
