@@ -82,10 +82,10 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 
 #### Searching for Notes
 
-You can search for notes by asking the LLM:
+You can search for notes by tag (fulltext search is not yet supported):
 
 - `Find notes with tag +project`
-- `Search for notes about programming from May 2025`
+- `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
 
 To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs (for use with the `fetch_note` tool) will be returned.
