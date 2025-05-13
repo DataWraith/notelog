@@ -4,10 +4,11 @@ mod indexing;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub use indexing::{delete_notes_by_filepaths, get_all_note_filepaths};
+
 // Re-export indexing functions
-pub use indexing::{
-    delete_notes_by_filepaths, get_all_note_filepaths, index_notes_with_channel, process_note_file,
-};
+pub use indexing::{index_notes_with_channel, process_note_file};
 use rmcp::serde_json;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
