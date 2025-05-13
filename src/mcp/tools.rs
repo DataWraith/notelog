@@ -128,30 +128,8 @@ impl NotelogMCP {
         // Save the note
         match note.save(&self.notes_dir, None) {
             Ok(relative_path) => {
-                // Get the absolute path to the note file
-                let absolute_path = self.notes_dir.join(&relative_path);
-
-                // Process the note file to add it to the database
-                // We use tokio::task::block_in_place since process_note_file is an async function
-                // but add_note is not async
-                if let Err(e) = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        crate::db::process_note_file(
-                            self.db.pool(),
-                            &self.notes_dir,
-                            &absolute_path,
-                        )
-                        .await
-                    })
-                }) {
-                    // Return an error if the note couldn't be added to the database
-                    return Ok(CallToolResult::error(vec![Content::text(format!(
-                        "Error adding note to database: {}",
-                        e
-                    ))]));
-                }
-
                 // Return the relative path as the success message
+                // The file monitoring system will automatically detect and process the new file
                 Ok(CallToolResult::success(vec![Content::text(format!(
                     "Note added successfully: {}",
                     relative_path.display()

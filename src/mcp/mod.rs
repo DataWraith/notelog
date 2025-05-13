@@ -36,6 +36,11 @@ pub fn run_mcp_server_with_db<P: AsRef<std::path::Path>>(
             .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
+        // Start the background task to monitor the notes directory for changes
+        db.start_monitoring_task()
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
         // Create the NotelogMCP handler with the database
         let handler = NotelogMCP::with_db(notes_dir, db);
 

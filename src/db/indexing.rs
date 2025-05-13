@@ -18,7 +18,7 @@ use crate::error::{DatabaseError, NotelogError, Result};
 /// - Have a filename that starts with '1' or '2' (for year 1xxx or 2xxx)
 ///   to filter out non-note files like README.md or monthly rollups
 /// - Be less than 50 KiB in size
-async fn is_valid_note_file(path: &Path) -> bool {
+pub async fn is_valid_note_file(path: &Path) -> bool {
     // Check if it's a markdown file
     if !path.extension().is_some_and(|ext| ext == "md") {
         return false;

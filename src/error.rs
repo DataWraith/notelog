@@ -40,6 +40,9 @@ pub enum DatabaseError {
 
     #[error("Database serialization error: {0}")]
     SerializationError(String),
+
+    #[error("File monitoring error: {0}")]
+    MonitoringError(String),
 }
 
 #[derive(Error, Debug)]

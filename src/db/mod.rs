@@ -1,6 +1,7 @@
 //! Database implementation for notelog
 
 mod indexing;
+mod monitoring;
 #[cfg(test)]
 mod tests;
 
@@ -8,7 +9,9 @@ mod tests;
 pub use indexing::{delete_notes_by_filepaths, get_all_note_filepaths};
 
 // Re-export indexing functions
-pub use indexing::{index_notes_with_channel, process_note_file};
+pub use indexing::{index_notes_with_channel, is_valid_note_file, process_note_file};
+// Re-export monitoring functions
+pub use monitoring::start_file_monitoring;
 use rmcp::serde_json;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
@@ -77,6 +80,16 @@ impl Database {
         });
 
         Ok(())
+    }
+
+    /// Start a background task to monitor the notes directory for changes
+    pub async fn start_monitoring_task(&self) -> Result<()> {
+        // Clone the pool and notes_dir for the background task
+        let pool = self.pool.clone();
+        let notes_dir = self.notes_dir.clone();
+
+        // Start the file monitoring task
+        start_file_monitoring(pool, &notes_dir).await
     }
 
     /// Get the database connection pool
