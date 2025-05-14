@@ -8,7 +8,7 @@ mod mcp;
 mod utils;
 
 use clap::Parser;
-use std::io::{self, Read};
+use std::io::{self, IsTerminal, Read};
 
 use cli::{AddArgs, Cli, Commands};
 use error::Result;
@@ -35,7 +35,7 @@ fn run() -> Result<()> {
     match cli.command {
         Some(Commands::Add(args)) => {
             // Only check stdin for the add command
-            let stdin_content = if atty::isnt(atty::Stream::Stdin) {
+            let stdin_content = if !io::stdin().is_terminal() {
                 let mut buffer = Vec::new();
                 io::stdin().read_to_end(&mut buffer)?;
                 buffer
@@ -54,7 +54,7 @@ fn run() -> Result<()> {
             };
 
             // Only check stdin for the default add command
-            let stdin_content = if atty::isnt(atty::Stream::Stdin) {
+            let stdin_content = if !io::stdin().is_terminal() {
                 let mut buffer = Vec::new();
                 io::stdin().read_to_end(&mut buffer)?;
                 buffer
