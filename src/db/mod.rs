@@ -344,4 +344,157 @@ impl Database {
 
         Ok((notes, total_count as usize))
     }
+
+    /// Search for notes using fulltext search
+    ///
+    /// Returns a BTreeMap of note IDs to Notes that match the search query.
+    ///
+    /// # Parameters
+    ///
+    /// * `query` - The search query string
+    /// * `before` - Optional DateTime to filter notes created before this time
+    /// * `after` - Optional DateTime to filter notes created after this time
+    /// * `limit` - Optional limit on the number of results to return
+    ///
+    /// The query can include tag prefixes (e.g., "+project") to search for specific tags.
+    /// If both `before` and `after` are provided and `before` is less than `after`,
+    /// an empty result will be returned as this represents a non-overlapping date range.
+    pub async fn search_notes(
+        &self,
+        query: &str,
+        before: Option<chrono::DateTime<chrono::Local>>,
+        after: Option<chrono::DateTime<chrono::Local>>,
+        limit: Option<usize>,
+    ) -> Result<(std::collections::BTreeMap<i64, Note>, usize)> {
+        if query.trim().is_empty() {
+            return Ok((std::collections::BTreeMap::new(), 0));
+        }
+
+        // Check for non-overlapping date range
+        if let (Some(before_date), Some(after_date)) = (before.as_ref(), after.as_ref()) {
+            if before_date < after_date {
+                // Non-overlapping date range, return empty result
+                return Ok((std::collections::BTreeMap::new(), 0));
+            }
+        }
+
+        // Build the count query with parameter placeholders
+        let mut count_query = String::from(
+            r#"
+            SELECT COUNT(*)
+            FROM notes_fts fts
+            JOIN notes n ON fts.rowid = n.id
+            WHERE notes_fts MATCH ?
+            "#,
+        );
+
+        // Add date conditions to the count query if needed
+        if before.is_some() {
+            count_query.push_str(" AND json_extract(n.metadata, '$.created') <= ?");
+        }
+
+        if after.is_some() {
+            count_query.push_str(" AND json_extract(n.metadata, '$.created') >= ?");
+        }
+
+        // Create a query builder for the count query
+        let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query);
+
+        // Bind the search query parameter
+        count_query_builder = count_query_builder.bind(query);
+
+        // Bind date parameters if provided
+        if let Some(before_date) = &before {
+            let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            count_query_builder = count_query_builder.bind(before_str);
+        }
+
+        if let Some(after_date) = &after {
+            let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            count_query_builder = count_query_builder.bind(after_str);
+        }
+
+        // Execute the count query
+        let total_count = count_query_builder
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // If limit is 0, only return the count
+        if let Some(limit_val) = limit {
+            if limit_val == 0 {
+                return Ok((std::collections::BTreeMap::new(), total_count as usize));
+            }
+        }
+
+        // Build the main query with parameter placeholders
+        let mut main_query = String::from(
+            r#"
+            SELECT
+                n.id,
+                n.metadata,
+                n.content,
+                rank
+            FROM notes_fts fts
+            JOIN notes n ON fts.rowid = n.id
+            WHERE notes_fts MATCH ?
+            "#,
+        );
+
+        // Add date conditions to the main query if needed
+        if before.is_some() {
+            main_query.push_str(" AND json_extract(n.metadata, '$.created') <= ?");
+        }
+
+        if after.is_some() {
+            main_query.push_str(" AND json_extract(n.metadata, '$.created') >= ?");
+        }
+
+        // Add ORDER BY clause
+        main_query.push_str(" ORDER BY rank, json_extract(n.metadata, '$.created') DESC");
+
+        // Add LIMIT clause if provided
+        if let Some(limit_val) = limit {
+            main_query.push_str(&format!(" LIMIT {}", limit_val));
+        }
+
+        // Create a query builder for the main query
+        let mut main_query_builder = sqlx::query_as::<_, (i64, String, String, f64)>(&main_query);
+
+        // Bind the search query parameter
+        main_query_builder = main_query_builder.bind(query);
+
+        // Bind date parameters if provided
+        if let Some(before_date) = &before {
+            let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            main_query_builder = main_query_builder.bind(before_str);
+        }
+
+        if let Some(after_date) = &after {
+            let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+            main_query_builder = main_query_builder.bind(after_str);
+        }
+
+        // Execute the query
+        let notes_data = main_query_builder
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // Convert the results to a BTreeMap of id => Note
+        let mut notes = std::collections::BTreeMap::new();
+        for (id, metadata_json, content, _rank) in notes_data {
+            // Parse the frontmatter from the metadata JSON
+            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
+                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+
+            // Create a Note from the frontmatter and content
+            let note = Note::new(frontmatter, content);
+
+            // Add the note to the map
+            notes.insert(id, note);
+        }
+
+        Ok((notes, total_count as usize))
+    }
 }

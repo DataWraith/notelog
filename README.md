@@ -43,7 +43,7 @@ notelog
 
 ### Notes Directory
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > You will need to create the notes directory yourself before using Notelog.
 
 By default, notes are stored in `~/NoteLog`. You can specify a different directory using the `-d` or `--notes-dir` option, or by setting the `NOTELOG_DIR` environment variable.
@@ -82,11 +82,20 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 
 #### Searching for Notes
 
-You can search for notes by tag (fulltext search is not yet supported):
+You can search for notes using fulltext search or by specific tags:
 
+- `Search for notes about meetings`
+- `Find notes containing "project plan" with tag +important`
+- `Look for notes mentioning databases from May 2025`
 - `Find notes with tag +project`
 - `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
+
+The search supports:
+- Content search (words or phrases in the note)
+- Tag search (using the `+tag` syntax)
+- Date filtering (e.g., "from May 2025")
+- Combinations of the above
 
 To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs will be returned. The LLM can then use these IDs to retrieve the note contents on request.
 

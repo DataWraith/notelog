@@ -23,17 +23,37 @@ Use the `add_note` tool to create new notes in order to capture the user's thoug
 
 ## Searching Notes
 
-Use the `search_by_tags` tool to find notes that match specific tags. The result will also include the total number of matching results.
+### Fulltext Search
+
+Use the `search_notes` tool to find notes using fulltext search. This allows searching both note content and tags.
+
+The user might ask:
+
+- "Search for notes about meetings"
+- "Find notes containing 'project plan' with tag +important"
+- "Look for notes mentioning databases from May 2025"
+
+When using fulltext search:
+
+1. Convert the user's request into a search query
+2. Include tag prefixes (e.g., "+project") when the user wants to search for specific tags
+3. Use date filters (`before` and `after`) when the user specifies a time range
+4. Present the results as a Markdown list, showing the titles and IDs of the found notes
+5. If there are many results, suggest refining the search with more specific terms or tags
+
+### Tag-Based Search
+
+Use the `search_by_tags` tool to find notes that match specific tags only. The result will also include the total number of matching results.
 
 The user might ask:
 
 - "Find notes with tag X and Y."
-- "What notes do I have about X from {current_month} {current_year}?"
+- "What notes do I have tagged with +project from {current_month} {current_year}?"
 - "How many notes with tag X do I have?"
 
-When searching:
+When searching by tags:
 
 1. Convert the user's request into appropriate tags
 2. Use date filters (`before` and `after`) when the user specifies a time range
-3. Present the results as a Markdown list, showing the titles and ids of the found notes
+3. Present the results as a Markdown list, showing the titles and IDs of the found notes
 4. If there are many results, suggest adding more specific tags to narrow the search

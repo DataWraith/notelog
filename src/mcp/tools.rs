@@ -69,6 +69,37 @@ pub struct SearchByTagsRequest {
     pub limit: Option<usize>,
 }
 
+/// Request structure for the SearchNotes tool
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct SearchNotesRequest {
+    /// The search query string
+    #[schemars(
+        description = "Search query string. Can include content terms and/or tags with '+' prefix (e.g., '+project')."
+    )]
+    pub query: String,
+
+    /// Optional date to filter notes created before this time (ISO8601 format)
+    #[schemars(
+        description = "Optional date to select only notes created before this time (ISO8601 format, e.g., '2025-05-01T12:00:00Z')"
+    )]
+    #[serde(default)]
+    pub before: Option<String>,
+
+    /// Optional date to filter notes created after this time (ISO8601 format)
+    #[schemars(
+        description = "Optional date to select only notes created after this time (ISO8601 format, e.g., '2025-04-01T12:00:00Z')"
+    )]
+    #[serde(default)]
+    pub after: Option<String>,
+
+    /// Optional limit on the number of results to return (max MAX_SEARCH_RESULTS, default DEFAULT_SEARCH_RESULTS)
+    #[schemars(
+        description = "Optional limit on the number of results to return (max 25, default 10). Set to 0 to only return the count of matching notes without their content."
+    )]
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
 /// NotelogMCP tools for interacting with notes via MCP
 #[derive(Debug, Clone)]
 pub struct NotelogMCP {
@@ -299,6 +330,117 @@ impl NotelogMCP {
 
                     if total_count > MAX_SEARCH_RESULTS {
                         response.push_str("\n\nNOTE: The query matches too many notes. Be more specific by adding more tags or limit the search using `before` and `after`.");
+                    }
+
+                    response
+                }
+            }
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error searching for notes: {}",
+                    e
+                ))]));
+            }
+        };
+
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Search for notes using fulltext search
+    #[tool(description = include_str!("instructions/search_notes.md"))]
+    async fn search_notes(
+        &self,
+        #[tool(aggr)] request: SearchNotesRequest,
+    ) -> Result<CallToolResult, McpError> {
+        // Database is now always available
+        let db = &self.db;
+
+        // Validate that a query is provided
+        if request.query.trim().is_empty() {
+            return Ok(CallToolResult::error(vec![Content::text(
+                "A search query must be provided.",
+            )]));
+        }
+
+        // Parse before date if provided
+        let before = if let Some(before_str) = &request.before {
+            match DateTime::parse_from_rfc3339(before_str) {
+                Ok(dt) => Some(dt.with_timezone(&Local)),
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Invalid 'before' date format: {}",
+                        e
+                    ))]));
+                }
+            }
+        } else {
+            None
+        };
+
+        // Parse after date if provided
+        let after = if let Some(after_str) = &request.after {
+            match DateTime::parse_from_rfc3339(after_str) {
+                Ok(dt) => Some(dt.with_timezone(&Local)),
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Invalid 'after' date format: {}",
+                        e
+                    ))]));
+                }
+            }
+        } else {
+            None
+        };
+
+        // Check for invalid date range
+        if let (Some(before_date), Some(after_date)) = (&before, &after) {
+            if before_date < after_date {
+                return Ok(CallToolResult::error(vec![Content::text(
+                    "'before' date must be greater than or equal to 'after' date.",
+                )]));
+            }
+        }
+
+        // Get the limit parameter, with default of DEFAULT_SEARCH_RESULTS if not specified
+        let query_limit = request.limit.unwrap_or(DEFAULT_SEARCH_RESULTS);
+
+        // Validate the limit parameter
+        if query_limit > MAX_SEARCH_RESULTS {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "Limit cannot exceed {}. Please specify a lower limit.",
+                MAX_SEARCH_RESULTS
+            ))]));
+        }
+
+        // Search for notes with the specified query
+        let result = match db
+            .search_notes(&request.query, before, after, Some(query_limit))
+            .await
+        {
+            Ok((notes, total_count)) => {
+                // If limit is 0, only return the count
+                if query_limit == 0 {
+                    format!("The query matched {total_count} notes.")
+                } else if notes.is_empty() {
+                    // If there are no results, add a message
+                    "The query matched 0 notes.\n\nHint: You may need to try different search terms or a larger date range.".to_string()
+                } else {
+                    // Create a map of note ID to title
+                    let mut id_to_title = BTreeMap::new();
+                    for (id, note) in &notes {
+                        let title = note.extract_title();
+                        id_to_title.insert(id, title);
+                    }
+
+                    // Convert the map to JSON
+                    let json =
+                        serde_json::to_string(&id_to_title).unwrap_or_else(|_| "{}".to_string());
+
+                    // Add a message about the number of results
+                    let mut response = format!("The query matched {total_count} notes.\n\n{json}");
+
+                    if total_count > MAX_SEARCH_RESULTS {
+                        response.push_str("\n\nNOTE: The query matches too many notes. Be more specific with your search terms or limit the search using `before` and `after`.");
                     }
 
                     response
