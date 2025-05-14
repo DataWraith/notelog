@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.4.0'></a>
+# 0.4.0 — 2025-05-14
+
+## Changed
+
+- Searching for notes now uses a fulltext index (SQLite's FTS5 extension) instead of the tagging system.
+
 <a id='changelog-0.3.0'></a>
 # 0.3.0 — 2025-05-13
 
