@@ -84,10 +84,8 @@ The default prompt instructs the LLM to automatically add tags and a title to th
 
 You can search for notes using fulltext search or by specific tags:
 
-- `Search for notes about meetings`
 - `Find notes containing "project plan" with tag +important`
 - `Look for notes mentioning databases from May 2025`
-- `Find notes with tag +project`
 - `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
 
