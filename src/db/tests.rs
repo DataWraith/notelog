@@ -67,25 +67,22 @@ mod tests {
                 .await
                 .unwrap();
 
-            // Search for notes by tags
+            // Search for notes by tag using fulltext search
+            let (notes, total_count) = db.search_notes("test", None, None, None).await.unwrap();
+            assert_eq!(notes.len(), 1);
+            assert_eq!(total_count, 1);
+
+            // Search for notes by multiple tags using fulltext search
             let (notes, total_count) = db
-                .search_by_tags(&["test"], None, None, None)
+                .search_notes("test example", None, None, None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 1);
             assert_eq!(total_count, 1);
 
-            // Search for notes by multiple tags
+            // Search for non-existent tag using fulltext search
             let (notes, total_count) = db
-                .search_by_tags(&["test", "example"], None, None, None)
-                .await
-                .unwrap();
-            assert_eq!(notes.len(), 1);
-            assert_eq!(total_count, 1);
-
-            // Search for non-existent tag
-            let (notes, total_count) = db
-                .search_by_tags(&["nonexistent"], None, None, None)
+                .search_notes("nonexistent", None, None, None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 0);
@@ -173,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_search_by_tags_with_date_range() {
+    fn test_search_notes_with_date_range() {
         // Create a temporary directory for testing
         let temp_dir = TempDir::new().unwrap();
         let notes_dir = temp_dir.path();
@@ -224,10 +221,7 @@ mod tests {
                 .unwrap();
 
             // Test 1: Search with no date filters (should return all 3 notes)
-            let (notes, total_count) = db
-                .search_by_tags(&["test"], None, None, None)
-                .await
-                .unwrap();
+            let (notes, total_count) = db.search_notes("test", None, None, None).await.unwrap();
             assert_eq!(notes.len(), 3);
             assert_eq!(total_count, 3);
 
@@ -237,7 +231,7 @@ mod tests {
             // Test 2: Search for notes before 2025-05-20
             let before_date = Local.with_ymd_and_hms(2025, 5, 20, 0, 0, 0).unwrap();
             let (notes, total_count) = db
-                .search_by_tags(&["test"], Some(before_date), None, None)
+                .search_notes("test", Some(before_date), None, None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 2);
@@ -249,7 +243,7 @@ mod tests {
             // Test 3: Search for notes after 2025-05-10
             let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
             let (notes, total_count) = db
-                .search_by_tags(&["test"], None, Some(after_date), None)
+                .search_notes("test", None, Some(after_date), None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 2);
@@ -262,7 +256,7 @@ mod tests {
             let before_date = Local.with_ymd_and_hms(2025, 5, 25, 0, 0, 0).unwrap();
             let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
             let (notes, total_count) = db
-                .search_by_tags(&["test"], Some(before_date), Some(after_date), None)
+                .search_notes("test", Some(before_date), Some(after_date), None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 1);
@@ -275,7 +269,7 @@ mod tests {
             let before_date = Local.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap();
             let after_date = Local.with_ymd_and_hms(2025, 5, 10, 0, 0, 0).unwrap();
             let (notes, total_count) = db
-                .search_by_tags(&["test"], Some(before_date), Some(after_date), None)
+                .search_notes("test", Some(before_date), Some(after_date), None)
                 .await
                 .unwrap();
             assert_eq!(notes.len(), 0);

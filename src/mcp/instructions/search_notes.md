@@ -5,7 +5,7 @@ To search for notes, provide a query string and optional parameters:
    - Use `+tag` syntax to search for specific tags (e.g., `+project`)
    - Combine content and tag searches (e.g., `meeting notes +project`)
    - You can combine terms with AND, OR and NOT operators (parenthesize as needed)
-   - To search for a phrase, enclose it in "quotation marks" or join + the + words + with + plus-signs.
+   - To search for a phrase, enclose it in "quotation marks"
 
 2. Optional date filters to narrow down the search:
    - `before`: Find notes created before this date (ISO8601 format, e.g., '2025-05-01T12:00:00Z')
