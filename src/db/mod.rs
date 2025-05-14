@@ -186,8 +186,12 @@ impl Database {
         // Create a query builder for the count query
         let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query);
 
-        // Bind the search query parameter
-        count_query_builder = count_query_builder.bind(query);
+        // Process the query to handle tag prefixes (+ signs)
+        // In FTS5, + is a special character, so we need to escape it or transform the query
+        let processed_query = process_search_query(query);
+
+        // Bind the processed search query parameter
+        count_query_builder = count_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
         if let Some(before_date) = &before {
@@ -247,8 +251,8 @@ impl Database {
         // Create a query builder for the main query
         let mut main_query_builder = sqlx::query_as::<_, (i64, String, String, f64)>(&main_query);
 
-        // Bind the search query parameter
-        main_query_builder = main_query_builder.bind(query);
+        // Bind the processed search query parameter (reuse the one we created earlier)
+        main_query_builder = main_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
         if let Some(before_date) = &before {
@@ -282,5 +286,134 @@ impl Database {
         }
 
         Ok((notes, total_count as usize))
+    }
+}
+
+/// Process a search query to handle tag prefixes (+ signs)
+///
+/// In FTS5, + is a special character that means "required term", so we need to
+/// handle it specially when users want to search for tags with the + prefix.
+///
+/// This function transforms queries with tag prefixes into a format that works with FTS5.
+fn process_search_query(query: &str) -> String {
+    // If the query is empty, return an empty string
+    if query.trim().is_empty() {
+        return String::new();
+    }
+
+    // Split the query into words, preserving quoted phrases
+    let mut processed_words = Vec::new();
+    let mut current_word = String::new();
+    let mut in_quotes = false;
+    let mut escape_next = false;
+
+    for c in query.chars() {
+        match c {
+            // Handle escape character
+            '\\' if !escape_next => {
+                escape_next = true;
+                current_word.push(c);
+            }
+            // Handle quotes
+            '"' if !escape_next => {
+                in_quotes = !in_quotes;
+                // Don't include the quote in the processed word
+                // We'll add our own quotes later if needed
+                current_word.push(c);
+            }
+            // Handle spaces
+            ' ' if !in_quotes && !escape_next => {
+                if !current_word.is_empty() {
+                    processed_words.push(current_word);
+                    current_word = String::new();
+                }
+            }
+            // Handle all other characters
+            _ => {
+                escape_next = false;
+                current_word.push(c);
+            }
+        }
+    }
+
+    // Add the last word if there is one
+    if !current_word.is_empty() {
+        processed_words.push(current_word);
+    }
+
+    // Process each word
+    let processed_words: Vec<String> = processed_words
+        .into_iter()
+        .map(|word| {
+            if word.starts_with('+') {
+                // For tag searches (words starting with +), we need to escape the +
+                // We'll wrap it in quotes, but first escape any existing quotes
+                let escaped_word = word.replace('"', "\"\"");
+                format!("\"{}\"", escaped_word)
+            } else if word.contains('"') {
+                // If the word contains quotes, escape them for SQLite FTS5
+                word.replace('"', "\"\"")
+            } else {
+                // For regular words, keep them as is
+                word
+            }
+        })
+        .collect();
+
+    // Join the processed words back into a query string
+    processed_words.join(" ")
+}
+
+#[cfg(test)]
+mod query_tests {
+    use super::process_search_query;
+
+    #[test]
+    fn test_process_search_query_basic() {
+        // Test basic query with no special characters
+        assert_eq!(process_search_query("hello world"), "hello world");
+    }
+
+    #[test]
+    fn test_process_search_query_with_tags() {
+        // Test query with tag prefixes
+        assert_eq!(process_search_query("+tag1 +tag2"), "\"+tag1\" \"+tag2\"");
+    }
+
+    #[test]
+    fn test_process_search_query_with_quotes() {
+        // Test query with quotes
+        assert_eq!(
+            process_search_query("hello \"world\""),
+            "hello \"\"world\"\""
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_tag_and_quotes() {
+        // Test query with tag prefix and quotes
+        assert_eq!(
+            process_search_query("+tag \"hello\""),
+            "\"+tag\" \"\"hello\"\""
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_malformed_quotes() {
+        // Test query with malformed quotes
+        assert_eq!(process_search_query("hello \"world"), "hello \"\"world");
+    }
+
+    #[test]
+    fn test_process_search_query_with_malformed_tag_and_quotes() {
+        // Test query with malformed tag prefix and quotes
+        assert_eq!(process_search_query("+tag \"hello"), "\"+tag\" \"\"hello");
+    }
+
+    #[test]
+    fn test_process_search_query_with_empty_query() {
+        // Test empty query
+        assert_eq!(process_search_query(""), "");
+        assert_eq!(process_search_query("   "), "");
     }
 }
