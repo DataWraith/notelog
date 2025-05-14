@@ -140,10 +140,14 @@ async fn collect_note_files_with_channel(
 
 /// Get all note filepaths from the database
 pub async fn get_all_note_filepaths(pool: &Pool<Sqlite>) -> Result<Vec<String>> {
-    let filepaths = sqlx::query_scalar::<_, String>("SELECT filepath FROM notes")
-        .fetch_all(pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let filepaths = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT filepath FROM notes
+    "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     Ok(filepaths)
 }
@@ -159,11 +163,16 @@ pub async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]
     for filepath in filepaths {
         // The after_note_delete trigger will handle removing tag relationships
         // and updating tag usage counts
-        sqlx::query("DELETE FROM notes WHERE filepath = ?")
-            .bind(filepath)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        sqlx::query(
+            r#"
+            DELETE FROM notes
+            WHERE filepath = ?
+        "#,
+        )
+        .bind(filepath)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
     // Commit the transaction
@@ -196,12 +205,19 @@ pub async fn process_note_file(
         .to_string();
 
     // Check if the note already exists in the database with the same mtime
-    let existing =
-        sqlx::query_as::<_, (i64, String)>("SELECT id, mtime FROM notes WHERE filepath = ?")
-            .bind(&relative_path)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let existing = sqlx::query_as::<_, (i64, String)>(
+        r#"
+            SELECT
+                id,
+                mtime
+            FROM notes
+            WHERE filepath = ?
+        "#,
+    )
+    .bind(&relative_path)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     // If the note exists and has the same mtime, skip processing
     if let Some((_, db_mtime)) = &existing {
@@ -222,23 +238,41 @@ pub async fn process_note_file(
 
     // Insert or update the note in the database
     if let Some((id, _)) = &existing {
-        sqlx::query("UPDATE notes SET mtime = ?, metadata = ?, content = ? WHERE id = ?")
-            .bind(&mtime_str)
-            .bind(&metadata_json)
-            .bind(note.content())
-            .bind(id)
-            .execute(pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        sqlx::query(
+            r#"
+            UPDATE notes
+            SET
+                mtime = ?,
+                metadata = ?,
+                content = ?
+            WHERE id = ?
+        "#,
+        )
+        .bind(&mtime_str)
+        .bind(&metadata_json)
+        .bind(note.content())
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     } else {
-        sqlx::query("INSERT INTO notes (filepath, mtime, metadata, content) VALUES (?, ?, ?, ?)")
-            .bind(&relative_path)
-            .bind(&mtime_str)
-            .bind(&metadata_json)
-            .bind(note.content())
-            .execute(pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        sqlx::query(
+            r#"
+            INSERT INTO notes (
+                filepath,
+                mtime,
+                metadata,
+                content
+            ) VALUES (?, ?, ?, ?)
+        "#,
+        )
+        .bind(&relative_path)
+        .bind(&mtime_str)
+        .bind(&metadata_json)
+        .bind(note.content())
+        .execute(pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
     Ok(())

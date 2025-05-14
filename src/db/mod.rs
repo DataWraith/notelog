@@ -103,7 +103,13 @@ impl Database {
     pub async fn fetch_note_by_id(&self, id: i64) -> Result<Option<Note>> {
         // Query the database for the note with the given ID
         let note_data = sqlx::query_as::<_, (String, String)>(
-            "SELECT metadata, content FROM notes WHERE id = ?",
+            r#"
+            SELECT
+                metadata,
+                content
+            FROM notes
+            WHERE id = ?
+        "#,
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -159,7 +165,13 @@ impl Database {
 
         // First, get the total count of matching notes
         let mut count_query = String::from(
-            "SELECT COUNT(DISTINCT n.id) FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
+            r#"
+            SELECT COUNT(DISTINCT n.id)
+            FROM notes n
+            JOIN note_tags nt ON n.id = nt.note_id
+            JOIN tags t ON nt.tag_id = t.tag_id
+            WHERE t.tag_name IN (
+        "#,
         );
 
         // Add placeholders for each tag
@@ -235,7 +247,16 @@ impl Database {
 
         // Build the SQL query dynamically based on the number of tags
         let mut query = String::from(
-            "SELECT n.id, n.metadata, n.content FROM notes n JOIN note_tags nt ON n.id = nt.note_id JOIN tags t ON nt.tag_id = t.tag_id WHERE t.tag_name IN (",
+            r#"
+            SELECT
+                n.id,
+                n.metadata,
+                n.content
+            FROM notes n
+            JOIN note_tags nt ON n.id = nt.note_id
+            JOIN tags t ON nt.tag_id = t.tag_id
+            WHERE t.tag_name IN (
+        "#,
         );
 
         // Add placeholders for each tag
