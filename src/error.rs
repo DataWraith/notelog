@@ -16,6 +16,19 @@ pub enum TagError {
     InvalidCharacters(String),
 }
 
+/// Specific error type for Id validation errors
+#[derive(Error, Debug)]
+pub enum IdError {
+    #[error("Id cannot be empty")]
+    Empty,
+
+    #[error("Id must be exactly 16 characters, got {0}")]
+    InvalidLength(usize),
+
+    #[error("Id '{0}' can only contain lowercase letters and numbers")]
+    InvalidCharacters(String),
+}
+
 /// Specific error type for frontmatter validation errors
 #[derive(Error, Debug)]
 pub enum FrontmatterError {
@@ -85,6 +98,9 @@ pub enum NotelogError {
 
     #[error("Tag validation error: {0}")]
     TagError(#[from] TagError),
+
+    #[error("Id validation error: {0}")]
+    IdError(#[from] IdError),
 
     #[error("Frontmatter validation error: {0}")]
     FrontmatterError(#[from] FrontmatterError),

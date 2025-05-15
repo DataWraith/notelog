@@ -4,5 +4,6 @@
 //! including Note, Frontmatter, and Tag implementations.
 
 pub mod frontmatter;
+pub mod id;
 pub mod note;
 pub mod tags;
