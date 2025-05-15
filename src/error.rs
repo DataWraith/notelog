@@ -56,6 +56,9 @@ pub enum DatabaseError {
 
     #[error("File monitoring error: {0}")]
     MonitoringError(String),
+
+    #[error("Multiple notes found with ID prefix '{0}': {1} matches")]
+    MultipleMatchesError(String, usize),
 }
 
 #[derive(Error, Debug)]

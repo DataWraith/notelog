@@ -33,9 +33,9 @@ pub struct AddNoteRequest {
 /// Request structure for the FetchNote tool
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct FetchNoteRequest {
-    /// The ID of the note to fetch
-    #[schemars(description = "The ID of the note to fetch (integer)")]
-    pub id: i64,
+    /// The ID prefix of the note to fetch
+    #[schemars(description = "The ID prefix of the note to fetch (string)")]
+    pub id: String,
 }
 
 /// Request structure for the SearchNotes tool
@@ -127,7 +127,7 @@ impl NotelogMCP {
 
         // Save the note
         match note.save(&self.notes_dir, None) {
-            Ok(relative_path) => {
+            Ok(_relative_path) => {
                 // Get the note ID from the frontmatter
                 let id = note.frontmatter().id().expect("Note should have an ID");
 
@@ -145,7 +145,7 @@ impl NotelogMCP {
         }
     }
 
-    /// Fetch a note by its ID
+    /// Fetch a note by its ID prefix
     #[tool(description = include_str!("instructions/fetch_note.md"))]
     async fn fetch_note(
         &self,
@@ -154,8 +154,8 @@ impl NotelogMCP {
         // Database is now always available
         let db = &self.db;
 
-        // Fetch the note by ID
-        match db.fetch_note_by_id(request.id).await {
+        // Fetch the note by ID prefix
+        match db.fetch_note_by_id(&request.id).await {
             Ok(Some(note)) => {
                 // Extract tags from the note
                 let tags: Vec<String> = note
@@ -167,6 +167,7 @@ impl NotelogMCP {
 
                 // Create a response object with tags and content
                 let response = serde_json::json!({
+                    "id": note.frontmatter().id().unwrap().as_str(),
                     "tags": tags,
                     "content": note.content()
                 });
@@ -184,7 +185,15 @@ impl NotelogMCP {
                 )]))
             }
             Err(e) => {
-                // Error fetching note
+                // Check for the specific MultipleMatchesError
+                if let Some(error_message) = e.to_string().strip_prefix("Database error: Multiple notes found with ID prefix ") {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Multiple notes found with ID prefix {}. Please provide a longer prefix.",
+                        error_message
+                    ))]));
+                }
+
+                // Generic error handling
                 Ok(CallToolResult::error(vec![Content::text(format!(
                     "Error fetching note: {}",
                     e

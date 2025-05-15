@@ -168,26 +168,55 @@ impl Database {
         &self.pool
     }
 
-    /// Fetch a note by its ID
+    /// Fetch a note by its ID prefix
     ///
-    /// Returns the note if found, or None if no note with the given ID exists.
-    pub async fn fetch_note_by_id(&self, id: i64) -> Result<Option<Note>> {
-        // Query the database for the note with the given ID
+    /// This function searches for notes with IDs that start with the provided prefix.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(Note))` - If exactly one note is found with the given ID prefix
+    /// * `Ok(None)` - If no notes are found with the given ID prefix
+    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
+    pub async fn fetch_note_by_id(&self, id_prefix: &str) -> Result<Option<Note>> {
+        // Count how many notes have an ID that starts with this prefix
+        let count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM notes
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#
+        )
+        .bind(id_prefix)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // If no notes match, return None
+        if count == 0 {
+            return Ok(None);
+        }
+
+        // If multiple notes match, return an error with the count
+        if count > 1 {
+            return Err(DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into());
+        }
+
+        // If exactly one note matches, fetch it
         let note_data = sqlx::query_as::<_, (String, String)>(
             r#"
             SELECT
                 metadata,
                 content
             FROM notes
-            WHERE id = ?
-        "#,
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#,
         )
-        .bind(id)
+        .bind(id_prefix)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        // If no note was found, return None
+        // This should always be Some since we checked the count above
         if let Some((metadata_json, content)) = note_data {
             // Parse the frontmatter from the metadata JSON
             let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
@@ -198,6 +227,7 @@ impl Database {
 
             Ok(Some(note))
         } else {
+            // This should never happen, but handle it just in case
             Ok(None)
         }
     }

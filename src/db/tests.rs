@@ -250,6 +250,92 @@ mod tests {
     }
 
     #[test]
+    fn test_fetch_note_by_id_prefix() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a tokio runtime for testing
+        let rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            // Create year/month directories
+            let year_dir = notes_dir.join("2025");
+            let month_dir = year_dir.join("05");
+            fs::create_dir_all(&month_dir).unwrap();
+
+            // Create three test notes with different IDs
+            // Note 1: ID starts with "abcd1234"
+            let id1 = "abcd1234efgh0000";
+            let yaml1 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id1);
+            let frontmatter1 = yaml1.parse::<Frontmatter>().unwrap();
+            let content1 = "# Test Note 1\nThis is the first test note.";
+            let note1 = Note::new(frontmatter1.clone(), content1.to_string());
+
+            // Note 2: ID starts with "abcd5678"
+            let id2 = "abcd5678efgh0000";
+            let yaml2 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id2);
+            let frontmatter2 = yaml2.parse::<Frontmatter>().unwrap();
+            let content2 = "# Test Note 2\nThis is the second test note.";
+            let note2 = Note::new(frontmatter2.clone(), content2.to_string());
+
+            // Note 3: ID starts with "wxyz"
+            let id3 = "wxyz1234efgh0000";
+            let yaml3 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id3);
+            let frontmatter3 = yaml3.parse::<Frontmatter>().unwrap();
+            let content3 = "# Test Note 3\nThis is the third test note.";
+            let note3 = Note::new(frontmatter3.clone(), content3.to_string());
+
+            // Save the notes to disk
+            let _note_path1 = note1.save(notes_dir, Some("Test Note 1")).unwrap();
+            let _note_path2 = note2.save(notes_dir, Some("Test Note 2")).unwrap();
+            let _note_path3 = note3.save(notes_dir, Some("Test Note 3")).unwrap();
+
+            // Initialize the database
+            let db = Database::initialize(notes_dir).await.unwrap();
+
+            // Run the indexing task
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
+
+            // Test 1: Fetch note with a unique prefix
+            let result = db.fetch_note_by_id("wx").await;
+            assert!(result.is_ok());
+            let note_option = result.unwrap();
+            assert!(note_option.is_some());
+            let note = note_option.unwrap();
+            assert_eq!(note.frontmatter().id().unwrap().as_str(), id3);
+            // The content might have newlines added, so just check that it contains the original content
+            assert!(note.content().contains(content3));
+
+            // Test 2: Fetch note with a longer unique prefix
+            let result = db.fetch_note_by_id("abcd1").await;
+            assert!(result.is_ok());
+            let note_option = result.unwrap();
+            assert!(note_option.is_some());
+            let note = note_option.unwrap();
+            assert_eq!(note.frontmatter().id().unwrap().as_str(), id1);
+            // The content might have newlines added, so just check that it contains the original content
+            assert!(note.content().contains(content1));
+
+            // Test 3: Fetch note with a non-unique prefix (should return an error)
+            let result = db.fetch_note_by_id("abcd").await;
+            assert!(result.is_err());
+            let error = result.unwrap_err();
+            let error_string = error.to_string();
+            assert!(error_string.contains("Multiple notes found with ID prefix 'abcd': 2 matches"),
+                   "Expected error message about multiple matches, got: {}", error_string);
+
+            // Test 4: Fetch note with a non-existent prefix
+            let result = db.fetch_note_by_id("nonexistent").await;
+            assert!(result.is_ok());
+            let note_option = result.unwrap();
+            assert!(note_option.is_none());
+        });
+    }
+
+    #[test]
     fn test_search_notes_with_date_range() {
         // Create a temporary directory for testing
         let temp_dir = TempDir::new().unwrap();
