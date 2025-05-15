@@ -71,8 +71,15 @@ impl Frontmatter {
 
     /// Format the frontmatter as a YAML string
     pub fn to_yaml(&self) -> String {
+        // Add id (should always be present, but handle None case just in case)
+        let id_yaml = if let Some(id) = &self.id {
+            format!("id: {}\n", id)
+        } else {
+            String::new()
+        };
+
         // Format with one-second precision (no fractional seconds)
-        let created_iso = self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+        let created_yaml = self.created.format("created: %Y-%m-%dT%H:%M:%S%:z\n");
 
         // Format tags for YAML, omitting the tags array if it's empty
         let tags_yaml = if !self.tags.is_empty() {
@@ -85,14 +92,7 @@ impl Frontmatter {
             String::new()
         };
 
-        // Add id (should always be present, but handle None case just in case)
-        let id_yaml = if let Some(id) = &self.id {
-            format!("id: {}\n", id)
-        } else {
-            String::new()
-        };
-
-        format!("---\n{}created: {}{}\n---", id_yaml, created_iso, tags_yaml)
+        format!("---\n{}{}{}\n---", id_yaml, created_yaml, tags_yaml)
     }
 
     /// Apply frontmatter to content
