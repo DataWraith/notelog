@@ -71,7 +71,7 @@ impl Frontmatter {
 
     /// Format the frontmatter as a YAML string
     pub fn to_yaml(&self) -> String {
-        // Add id (should always be present, but handle None case just in case)
+        // Add id
         let id_yaml = if let Some(id) = &self.id {
             format!("id: {}\n", id)
         } else {
@@ -194,7 +194,7 @@ impl FromStr for Frontmatter {
             }
         }
 
-        // Parse the id if present, or generate a random one if not
+        // Parse the id if present
         let id = if let Some(id_str) = frontmatter_data.id {
             match Id::from_str(&id_str) {
                 Ok(id) => Some(id),
