@@ -281,11 +281,11 @@ impl NotelogMCP {
                     // If there are no results, add a message
                     "The query matched 0 notes.\n\nHint: You may need to try different search terms or a larger date range.".to_string()
                 } else {
-                    // Create a map of note ID to title
+                    // Create a map of note ID prefix to title
                     let mut id_to_title = BTreeMap::new();
-                    for (id, note) in &notes {
+                    for (id_prefix, note) in &notes {
                         let title = note.extract_title();
-                        id_to_title.insert(id, title);
+                        id_to_title.insert(id_prefix, title);
                     }
 
                     // Convert the map to JSON

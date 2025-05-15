@@ -1,7 +1,8 @@
 To fetch a specific note by its ID prefix:
 
 1. Provide the ID prefix of the note you want to retrieve
-   - The ID prefix can be as short as 2 characters
+   - The ID prefix can be as short as 2 characters.
+     Note that you cannot fetch notes with an ID that starts with an underscore.
    - You can get note IDs from the `search_notes` tool results
    - If multiple notes match the prefix, you'll need to provide a longer prefix
 
