@@ -1,6 +1,6 @@
 //! Id implementation for notelog
 
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -27,7 +27,9 @@ impl Id {
 
         // Check if the processed input has the correct length
         if processed_input.len() != 16 {
-            return Err(NotelogError::IdError(IdError::InvalidLength(processed_input.len())));
+            return Err(NotelogError::IdError(IdError::InvalidLength(
+                processed_input.len(),
+            )));
         }
 
         // Check if the processed input contains only valid base36 characters (0-9, a-z)
@@ -35,7 +37,9 @@ impl Id {
             .chars()
             .all(|c| c.is_ascii_digit() || (c.is_ascii_lowercase() && c.is_ascii_alphabetic()))
         {
-            return Err(NotelogError::IdError(IdError::InvalidCharacters(processed_input.to_string())));
+            return Err(NotelogError::IdError(IdError::InvalidCharacters(
+                processed_input.to_string(),
+            )));
         }
 
         Ok(Id(processed_input))
@@ -91,20 +95,44 @@ mod tests {
     #[test]
     fn test_id_new() {
         // Valid IDs
-        assert_eq!(Id::new("0123456789abcdef").unwrap().as_str(), "0123456789abcdef");
-        assert_eq!(Id::new("abcdefghijklmnop").unwrap().as_str(), "abcdefghijklmnop");
-        assert_eq!(Id::new("a0b1c2d3e4f5g6h7").unwrap().as_str(), "a0b1c2d3e4f5g6h7");
+        assert_eq!(
+            Id::new("0123456789abcdef").unwrap().as_str(),
+            "0123456789abcdef"
+        );
+        assert_eq!(
+            Id::new("abcdefghijklmnop").unwrap().as_str(),
+            "abcdefghijklmnop"
+        );
+        assert_eq!(
+            Id::new("a0b1c2d3e4f5g6h7").unwrap().as_str(),
+            "a0b1c2d3e4f5g6h7"
+        );
 
         // Test uppercase conversion
-        assert_eq!(Id::new("0123456789ABCDEF").unwrap().as_str(), "0123456789abcdef");
-        assert_eq!(Id::new("ABCDEFGHIJKLMNOP").unwrap().as_str(), "abcdefghijklmnop");
+        assert_eq!(
+            Id::new("0123456789ABCDEF").unwrap().as_str(),
+            "0123456789abcdef"
+        );
+        assert_eq!(
+            Id::new("ABCDEFGHIJKLMNOP").unwrap().as_str(),
+            "abcdefghijklmnop"
+        );
 
         // Test trimming
-        assert_eq!(Id::new(" 0123456789abcdef ").unwrap().as_str(), "0123456789abcdef");
-        assert_eq!(Id::new("\t0123456789abcdef\n").unwrap().as_str(), "0123456789abcdef");
+        assert_eq!(
+            Id::new(" 0123456789abcdef ").unwrap().as_str(),
+            "0123456789abcdef"
+        );
+        assert_eq!(
+            Id::new("\t0123456789abcdef\n").unwrap().as_str(),
+            "0123456789abcdef"
+        );
 
         // Test mixed case and trimming
-        assert_eq!(Id::new(" 0123456789ABCDEF ").unwrap().as_str(), "0123456789abcdef");
+        assert_eq!(
+            Id::new(" 0123456789ABCDEF ").unwrap().as_str(),
+            "0123456789abcdef"
+        );
 
         // Invalid IDs
         assert!(matches!(
@@ -144,10 +172,16 @@ mod tests {
         assert_ne!(id1, id2);
 
         // Verify they contain only valid characters
-        assert!(id1.as_str().chars().all(|c| c.is_ascii_digit() ||
-            (c.is_ascii_lowercase() && c.is_ascii_alphabetic())));
-        assert!(id2.as_str().chars().all(|c| c.is_ascii_digit() ||
-            (c.is_ascii_lowercase() && c.is_ascii_alphabetic())));
+        assert!(
+            id1.as_str()
+                .chars()
+                .all(|c| c.is_ascii_digit() || (c.is_ascii_lowercase() && c.is_ascii_alphabetic()))
+        );
+        assert!(
+            id2.as_str()
+                .chars()
+                .all(|c| c.is_ascii_digit() || (c.is_ascii_lowercase() && c.is_ascii_alphabetic()))
+        );
     }
 
     #[test]

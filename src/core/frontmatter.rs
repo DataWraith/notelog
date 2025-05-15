@@ -5,12 +5,16 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
+use crate::core::id::Id;
 use crate::core::tags::Tag;
 use crate::error::{FrontmatterError, NotelogError, Result};
 
 /// Represents the frontmatter of a note
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Frontmatter {
+    /// The unique identifier for the note (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<Id>,
     /// The creation timestamp
     created: DateTime<Local>,
     /// The tags associated with the note
@@ -19,16 +23,23 @@ pub struct Frontmatter {
 
 impl Frontmatter {
     /// Create a new frontmatter with the given creation timestamp and tags
+    /// A random Id will be generated automatically
     pub fn new(created: DateTime<Local>, tags: Vec<Tag>) -> Self {
-        Self { created, tags }
+        Self {
+            created,
+            tags,
+            id: Some(Id::default()),
+        }
     }
 
     /// Create a new frontmatter with the current timestamp and given tags
+    /// A random Id will be generated automatically
     pub fn with_tags(tags: Vec<Tag>) -> Self {
         Self::new(Local::now(), tags)
     }
 
     /// Create a new frontmatter with the current timestamp and no tags
+    /// A random Id will be generated automatically
     pub fn default() -> Self {
         Self::with_tags(vec![])
     }
@@ -53,6 +64,11 @@ impl Frontmatter {
         &self.tags
     }
 
+    /// Get the id if present
+    pub fn id(&self) -> Option<&Id> {
+        self.id.as_ref()
+    }
+
     /// Format the frontmatter as a YAML string
     pub fn to_yaml(&self) -> String {
         // Format with one-second precision (no fractional seconds)
@@ -69,7 +85,14 @@ impl Frontmatter {
             String::new()
         };
 
-        format!("---\ncreated: {}{}\n---", created_iso, tags_yaml)
+        // Add id (should always be present, but handle None case just in case)
+        let id_yaml = if let Some(id) = &self.id {
+            format!("id: {}\n", id)
+        } else {
+            String::new()
+        };
+
+        format!("---\n{}created: {}{}\n---", id_yaml, created_iso, tags_yaml)
     }
 
     /// Apply frontmatter to content
@@ -139,6 +162,8 @@ impl fmt::Display for Frontmatter {
 /// Serializable/deserializable frontmatter data structure
 #[derive(Serialize, Deserialize, Debug)]
 struct FrontmatterData {
+    #[serde(default)]
+    id: Option<String>,
     created: String,
     #[serde(default)]
     tags: Vec<String>,
@@ -169,7 +194,18 @@ impl FromStr for Frontmatter {
             }
         }
 
-        Ok(Self::new(created, tags))
+        // Parse the id if present, or generate a random one if not
+        let id = if let Some(id_str) = frontmatter_data.id {
+            match Id::from_str(&id_str) {
+                Ok(id) => Some(id),
+                Err(e) => return Err(e),
+            }
+        } else {
+            // Generate a random Id when not present in the file
+            Some(Id::default())
+        };
+
+        Ok(Self { created, tags, id })
     }
 }
 
@@ -186,29 +222,39 @@ mod tests {
         let tag2 = Tag::new("bar").unwrap();
         let tags = vec![tag1.clone(), tag2.clone()];
 
+        // Test new constructor
         let frontmatter = Frontmatter::new(date.clone(), tags.clone());
 
         assert_eq!(frontmatter.created(), &date);
         assert_eq!(frontmatter.tags().len(), 2);
         assert_eq!(frontmatter.tags()[0], tag1);
         assert_eq!(frontmatter.tags()[1], tag2);
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
 
         // Test with_tags constructor
         let frontmatter = Frontmatter::with_tags(tags.clone());
 
         // We can't directly compare timestamps due to the small time difference
-        // between creation and assertion, so we'll just check the tags
+        // between creation and assertion, so we'll just check the tags and id
         assert_eq!(frontmatter.tags().len(), 2);
         assert_eq!(frontmatter.tags()[0], tag1);
         assert_eq!(frontmatter.tags()[1], tag2);
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
 
         // Test default constructor
         let frontmatter = Frontmatter::default();
         assert_eq!(frontmatter.tags().len(), 0);
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
 
         // Test creating with empty tags
         let frontmatter = Frontmatter::with_tags(vec![]);
         assert_eq!(frontmatter.tags().len(), 0);
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
+
+        // Test that Ids are unique
+        let frontmatter1 = Frontmatter::default();
+        let frontmatter2 = Frontmatter::default();
+        assert_ne!(frontmatter1.id(), frontmatter2.id()); // Ids should be different
     }
 
     #[test]
@@ -269,18 +315,33 @@ mod tests {
         let tag2 = Tag::new("bar").unwrap();
         let tags = vec![tag1, tag2];
 
-        let frontmatter = Frontmatter::new(date.clone(), tags);
+        // Create a frontmatter with a specific ID for testing
+        let id = Id::new("0123456789abcdef").unwrap();
+        let frontmatter = Frontmatter { created: date.clone(), tags: tags.clone(), id: Some(id.clone()) };
+
         let yaml = frontmatter.to_yaml();
 
-        assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        // Id should appear first in the YAML
+        assert!(yaml.starts_with("---\nid: 0123456789abcdef\n"));
+        assert!(yaml.contains("created: 2025-04-01T12:00:00"));
         assert!(yaml.contains("tags:\n  - foo\n  - bar"));
         assert!(yaml.ends_with("---"));
 
-        // Test with empty tags - should omit tags array
+        // Test with no tags
+        let frontmatter = Frontmatter { created: date.clone(), tags: vec![], id: Some(id.clone()) };
+        let yaml = frontmatter.to_yaml();
+
+        assert!(yaml.starts_with("---\nid: 0123456789abcdef\n"));
+        assert!(yaml.contains("created: 2025-04-01T12:00:00"));
+        assert!(!yaml.contains("tags:"));
+        assert!(yaml.ends_with("---"));
+
+        // Test with auto-generated ID
         let frontmatter = Frontmatter::new(date, vec![]);
         let yaml = frontmatter.to_yaml();
 
-        assert!(yaml.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        assert!(yaml.contains("\nid: "));
+        assert!(yaml.contains("created: 2025-04-01T12:00:00"));
         assert!(!yaml.contains("tags:"));
         assert!(yaml.ends_with("---"));
     }
@@ -289,19 +350,24 @@ mod tests {
     fn test_frontmatter_apply_to_content() {
         let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
         let tag = Tag::new("test").unwrap();
-        let frontmatter = Frontmatter::new(date, vec![tag]);
+        let id = Id::new("0123456789abcdef").unwrap();
+
+        // Create a frontmatter with a specific ID for testing
+        let frontmatter = Frontmatter { created: date.clone(), tags: vec![tag.clone()], id: Some(id.clone()) };
 
         let content = "# Test Content\nThis is a test.";
         let result = frontmatter.apply_to_content(content);
 
-        assert!(result.starts_with("---\ncreated: 2025-04-01T12:00:00"));
+        // Id should appear first in the YAML
+        assert!(result.contains("---\nid: 0123456789abcdef\n"));
+        assert!(result.contains("created: 2025-04-01T12:00:00"));
         assert!(result.contains("tags:\n  - test"));
         assert!(result.contains("---\n\n# Test Content\nThis is a test.\n\n"));
     }
 
     #[test]
     fn test_frontmatter_extract_from_content() {
-        // Valid frontmatter
+        // Valid frontmatter with tags
         let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test\n---\n\n# Content";
         let result = Frontmatter::extract_from_content(content).unwrap();
 
@@ -309,6 +375,31 @@ mod tests {
         let frontmatter = result.0.unwrap();
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
+        assert_eq!(result.1, "# Content");
+
+        // Valid frontmatter with id
+        let content =
+            "---\nid: 0123456789abcdef\ncreated: 2025-04-01T12:00:00+00:00\n---\n\n# Content";
+        let result = Frontmatter::extract_from_content(content).unwrap();
+
+        assert!(result.0.is_some());
+        let frontmatter = result.0.unwrap();
+        assert_eq!(frontmatter.tags().len(), 0);
+        assert!(frontmatter.id().is_some());
+        assert_eq!(frontmatter.id().unwrap().as_str(), "0123456789abcdef");
+        assert_eq!(result.1, "# Content");
+
+        // Valid frontmatter with tags and id
+        let content = "---\nid: 0123456789abcdef\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test\n---\n\n# Content";
+        let result = Frontmatter::extract_from_content(content).unwrap();
+
+        assert!(result.0.is_some());
+        let frontmatter = result.0.unwrap();
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert!(frontmatter.id().is_some());
+        assert_eq!(frontmatter.id().unwrap().as_str(), "0123456789abcdef");
         assert_eq!(result.1, "# Content");
 
         // No frontmatter
@@ -321,16 +412,38 @@ mod tests {
         // Invalid frontmatter
         let content = "---\ncreated: invalid-date\ntags:\n  - test\n---\n\n# Content";
         assert!(Frontmatter::extract_from_content(content).is_err());
+
+        // Invalid id in frontmatter
+        let content = "---\nid: invalid-id\ncreated: 2025-04-01T12:00:00+00:00\n---\n\n# Content";
+        assert!(Frontmatter::extract_from_content(content).is_err());
     }
 
     #[test]
     fn test_frontmatter_from_str() {
-        // Valid YAML
+        // Valid YAML with tags
         let yaml = "created: 2025-04-01T12:00:00+00:00\ntags:\n  - test";
         let frontmatter = yaml.parse::<Frontmatter>().unwrap();
 
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert!(frontmatter.id().is_some()); // Random Id should be generated
+
+        // Valid YAML with id
+        let yaml = "id: 0123456789abcdef\ncreated: 2025-04-01T12:00:00+00:00";
+        let frontmatter = yaml.parse::<Frontmatter>().unwrap();
+
+        assert_eq!(frontmatter.tags().len(), 0);
+        assert!(frontmatter.id().is_some());
+        assert_eq!(frontmatter.id().unwrap().as_str(), "0123456789abcdef");
+
+        // Valid YAML with tags and id
+        let yaml = "id: 0123456789abcdef\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test";
+        let frontmatter = yaml.parse::<Frontmatter>().unwrap();
+
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert!(frontmatter.id().is_some());
+        assert_eq!(frontmatter.id().unwrap().as_str(), "0123456789abcdef");
 
         // Invalid YAML
         let yaml = "created: invalid-date\ntags:\n  - test";
@@ -339,5 +452,19 @@ mod tests {
         // Missing required field
         let yaml = "tags:\n  - test";
         assert!(yaml.parse::<Frontmatter>().is_err());
+
+        // Invalid id
+        let yaml = "id: invalid-id\ncreated: 2025-04-01T12:00:00+00:00";
+        assert!(yaml.parse::<Frontmatter>().is_err());
+
+        // Test that random Ids are generated and unique
+        let yaml1 = "created: 2025-04-01T12:00:00+00:00";
+        let yaml2 = "created: 2025-04-01T12:00:00+00:00";
+        let frontmatter1 = yaml1.parse::<Frontmatter>().unwrap();
+        let frontmatter2 = yaml2.parse::<Frontmatter>().unwrap();
+
+        assert!(frontmatter1.id().is_some());
+        assert!(frontmatter2.id().is_some());
+        assert_ne!(frontmatter1.id(), frontmatter2.id()); // Ids should be different
     }
 }

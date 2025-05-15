@@ -206,7 +206,9 @@ mod tests {
         let note = Note::new(frontmatter, content.to_string());
 
         let result = note.to_string();
-        assert!(result.starts_with("---\ncreated:"));
+        // Id should appear first in the YAML
+        assert!(result.starts_with("---\nid:"));
+        assert!(result.contains("created:"));
         // Empty tags array should be omitted
         assert!(!result.contains("tags:"));
         assert!(result.contains("---\n\n# Test Content\n\n"));
