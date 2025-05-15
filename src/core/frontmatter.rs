@@ -317,7 +317,11 @@ mod tests {
 
         // Create a frontmatter with a specific ID for testing
         let id = Id::new("0123456789abcdef").unwrap();
-        let frontmatter = Frontmatter { created: date.clone(), tags: tags.clone(), id: Some(id.clone()) };
+        let frontmatter = Frontmatter {
+            created: date.clone(),
+            tags: tags.clone(),
+            id: Some(id.clone()),
+        };
 
         let yaml = frontmatter.to_yaml();
 
@@ -328,7 +332,11 @@ mod tests {
         assert!(yaml.ends_with("---"));
 
         // Test with no tags
-        let frontmatter = Frontmatter { created: date.clone(), tags: vec![], id: Some(id.clone()) };
+        let frontmatter = Frontmatter {
+            created: date.clone(),
+            tags: vec![],
+            id: Some(id.clone()),
+        };
         let yaml = frontmatter.to_yaml();
 
         assert!(yaml.starts_with("---\nid: 0123456789abcdef\n"));
@@ -353,7 +361,11 @@ mod tests {
         let id = Id::new("0123456789abcdef").unwrap();
 
         // Create a frontmatter with a specific ID for testing
-        let frontmatter = Frontmatter { created: date.clone(), tags: vec![tag.clone()], id: Some(id.clone()) };
+        let frontmatter = Frontmatter {
+            created: date.clone(),
+            tags: vec![tag.clone()],
+            id: Some(id.clone()),
+        };
 
         let content = "# Test Content\nThis is a test.";
         let result = frontmatter.apply_to_content(content);

@@ -34,6 +34,11 @@ Example:
 
 This will find all notes containing "meeting notes" that also have the "project" tag, created between April 1st and May 1st, 2025, and return up to 15 results.
 
-The response will be a JSON object mapping note IDs to titles, limited to the specified number of results (or 10 by default).
+The response will be a JSON array of note objects, limited to the specified number of results (or 10 by default). Each note object contains:
 
-When displaying the results, create a Markdown list. Each line should display both the `id`, and the `title`, e.g. `* [{id}] {title}`.
+- `id`: The shortest unique prefix of the note's ID
+- `title`: The title extracted from the note content
+- `tags`: An array of tags associated with the note
+- `created`: The creation date
+
+When displaying the results, create a Markdown list or table that must contain the `id` and `title` fields at a minimum.

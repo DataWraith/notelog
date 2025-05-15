@@ -66,7 +66,7 @@ impl Database {
             SELECT COUNT(*)
             FROM notes
             WHERE json_extract(metadata, '$.id') = ?
-            "#
+            "#,
         )
         .bind(id_str)
         .fetch_one(&self.pool)
@@ -87,7 +87,7 @@ impl Database {
                 SELECT COUNT(*)
                 FROM notes
                 WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-                "#
+                "#,
             )
             .bind(prefix)
             .fetch_one(&self.pool)
@@ -184,7 +184,7 @@ impl Database {
             SELECT COUNT(*)
             FROM notes
             WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-            "#
+            "#,
         )
         .bind(id_prefix)
         .fetch_one(&self.pool)
@@ -198,7 +198,9 @@ impl Database {
 
         // If multiple notes match, return an error with the count
         if count > 1 {
-            return Err(DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into());
+            return Err(
+                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
+            );
         }
 
         // If exactly one note matches, fetch it
@@ -234,9 +236,9 @@ impl Database {
 
     /// Search for notes using fulltext search
     ///
-    /// Returns a BTreeMap of note ID prefixes to Notes that match the search query.
-    /// For notes with an ID in the frontmatter, the key will be the shortest unique prefix of the ID.
-    /// For notes without an ID, the key will be the database ID prefixed with an underscore.
+    /// Returns a Vec of Notes that match the search query, ordered by relevance.
+    /// The results are returned in the exact order from the database query to maintain
+    /// the relevance-based ranking.
     ///
     /// # Parameters
     ///
@@ -254,16 +256,16 @@ impl Database {
         before: Option<chrono::DateTime<chrono::Local>>,
         after: Option<chrono::DateTime<chrono::Local>>,
         limit: Option<usize>,
-    ) -> Result<(std::collections::BTreeMap<String, Note>, usize)> {
+    ) -> Result<(Vec<Note>, usize)> {
         if query.trim().is_empty() {
-            return Ok((std::collections::BTreeMap::new(), 0));
+            return Ok((Vec::new(), 0));
         }
 
         // Check for non-overlapping date range
         if let (Some(before_date), Some(after_date)) = (before.as_ref(), after.as_ref()) {
             if before_date < after_date {
                 // Non-overlapping date range, return empty result
-                return Ok((std::collections::BTreeMap::new(), 0));
+                return Ok((Vec::new(), 0));
             }
         }
 
@@ -316,7 +318,7 @@ impl Database {
         // If limit is 0, only return the count
         if let Some(limit_val) = limit {
             if limit_val == 0 {
-                return Ok((std::collections::BTreeMap::new(), total_count as usize));
+                return Ok((Vec::new(), total_count as usize));
             }
         }
 
@@ -374,33 +376,18 @@ impl Database {
             .await
             .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        // Convert the results to a BTreeMap of id_prefix => Note
-        let mut notes = std::collections::BTreeMap::new();
-        for (db_id, metadata_json, content, _rank) in notes_data {
+        // Convert the results to a Vec of Notes, preserving the order from the database query
+        let mut notes = Vec::with_capacity(notes_data.len());
+        for (_db_id, metadata_json, content, _rank) in notes_data {
             // Parse the frontmatter from the metadata JSON
             let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
                 .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
 
             // Create a Note from the frontmatter and content
-            let note = Note::new(frontmatter.clone(), content);
+            let note = Note::new(frontmatter, content);
 
-            // Determine the key for the note in the map
-            let key = if let Some(id) = frontmatter.id() {
-                // For notes with an ID, find the shortest unique prefix
-                match self.find_shortest_unique_id_prefix(id).await {
-                    Ok(prefix) => prefix,
-                    Err(_) => {
-                        // If there's an error finding the prefix, use the full ID
-                        id.as_str().to_string()
-                    }
-                }
-            } else {
-                // For notes without an ID, use the database ID prefixed with an underscore
-                format!("_{}", db_id)
-            };
-
-            // Add the note to the map
-            notes.insert(key, note);
+            // Add the note to the vector
+            notes.push(note);
         }
 
         Ok((notes, total_count as usize))

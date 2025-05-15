@@ -3,13 +3,13 @@ mod tests {
     use crate::core::frontmatter::Frontmatter;
     use crate::core::note::Note;
     use crate::core::tags::Tag;
-    use std::str::FromStr;
     use crate::db::{
         DB_FILENAME, Database, delete_notes_by_filepaths, get_all_note_filepaths,
         index_notes_with_channel,
     };
     use chrono::{Local, TimeZone};
     use std::fs;
+    use std::str::FromStr;
     use tempfile::TempDir;
     use tokio::runtime::Runtime;
 
@@ -324,8 +324,11 @@ mod tests {
             assert!(result.is_err());
             let error = result.unwrap_err();
             let error_string = error.to_string();
-            assert!(error_string.contains("Multiple notes found with ID prefix 'abcd': 2 matches"),
-                   "Expected error message about multiple matches, got: {}", error_string);
+            assert!(
+                error_string.contains("Multiple notes found with ID prefix 'abcd': 2 matches"),
+                "Expected error message about multiple matches, got: {}",
+                error_string
+            );
 
             // Test 4: Fetch note with a non-existent prefix
             let result = db.fetch_note_by_id("nonexistent").await;

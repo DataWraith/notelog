@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -186,7 +186,10 @@ impl NotelogMCP {
             }
             Err(e) => {
                 // Check for the specific MultipleMatchesError
-                if let Some(error_message) = e.to_string().strip_prefix("Database error: Multiple notes found with ID prefix ") {
+                if let Some(error_message) = e
+                    .to_string()
+                    .strip_prefix("Database error: Multiple notes found with ID prefix ")
+                {
                     return Ok(CallToolResult::error(vec![Content::text(format!(
                         "Multiple notes found with ID prefix {}. Please provide a longer prefix.",
                         error_message
@@ -281,16 +284,47 @@ impl NotelogMCP {
                     // If there are no results, add a message
                     "The query matched 0 notes.\n\nHint: You may need to try different search terms or a larger date range.".to_string()
                 } else {
-                    // Create a map of note ID prefix to title
-                    let mut id_to_title = BTreeMap::new();
-                    for (id_prefix, note) in &notes {
-                        let title = note.extract_title();
-                        id_to_title.insert(id_prefix, title);
+                    // Create a Vec of note data objects
+                    let mut note_results = Vec::with_capacity(notes.len());
+
+                    for note in &notes {
+                        // Get the ID from the note's frontmatter
+                        let id_key = if let Some(id) = note.frontmatter().id() {
+                            // For notes with an ID, find the shortest unique prefix
+                            match db.find_shortest_unique_id_prefix(id).await {
+                                Ok(prefix) => prefix,
+                                Err(_) => {
+                                    // If there's an error finding the prefix, use the full ID
+                                    id.as_str().to_string()
+                                }
+                            }
+                        } else {
+                            // For notes without an ID, use a placeholder value
+                            "_no_id".to_string()
+                        };
+
+                        // Extract tags from the note
+                        let tags: Vec<String> = note
+                            .frontmatter()
+                            .tags()
+                            .iter()
+                            .map(|tag| tag.as_str().to_string())
+                            .collect();
+
+                        // Create a note data object
+                        let note_data = serde_json::json!({
+                            "id": id_key,
+                            "title": note.extract_title(),
+                            "tags": tags,
+                            "created": note.frontmatter().created().format("%Y-%m-%d").to_string()
+                        });
+
+                        note_results.push(note_data);
                     }
 
-                    // Convert the map to JSON
+                    // Convert the Vec to JSON
                     let json =
-                        serde_json::to_string(&id_to_title).unwrap_or_else(|_| "{}".to_string());
+                        serde_json::to_string(&note_results).unwrap_or_else(|_| "[]".to_string());
 
                     // Add a message about the number of results
                     let mut response = format!("The query matched {total_count} notes.\n\n{json}");
