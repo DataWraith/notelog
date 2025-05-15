@@ -201,8 +201,7 @@ impl FromStr for Frontmatter {
                 Err(e) => return Err(e),
             }
         } else {
-            // Generate a random Id when not present in the file
-            Some(Id::default())
+            None
         };
 
         Ok(Self { created, tags, id })
@@ -387,7 +386,7 @@ mod tests {
         let frontmatter = result.0.unwrap();
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "test");
-        assert!(frontmatter.id().is_some()); // Random Id should be generated
+        assert!(frontmatter.id().is_none());
         assert_eq!(result.1, "# Content");
 
         // Valid frontmatter with id
@@ -438,7 +437,7 @@ mod tests {
 
         assert_eq!(frontmatter.tags().len(), 1);
         assert_eq!(frontmatter.tags()[0].as_str(), "test");
-        assert!(frontmatter.id().is_some()); // Random Id should be generated
+        assert!(frontmatter.id().is_none());
 
         // Valid YAML with id
         let yaml = "id: 0123456789abcdef\ncreated: 2025-04-01T12:00:00+00:00";
@@ -468,15 +467,5 @@ mod tests {
         // Invalid id
         let yaml = "id: invalid-id\ncreated: 2025-04-01T12:00:00+00:00";
         assert!(yaml.parse::<Frontmatter>().is_err());
-
-        // Test that random Ids are generated and unique
-        let yaml1 = "created: 2025-04-01T12:00:00+00:00";
-        let yaml2 = "created: 2025-04-01T12:00:00+00:00";
-        let frontmatter1 = yaml1.parse::<Frontmatter>().unwrap();
-        let frontmatter2 = yaml2.parse::<Frontmatter>().unwrap();
-
-        assert!(frontmatter1.id().is_some());
-        assert!(frontmatter2.id().is_some());
-        assert_ne!(frontmatter1.id(), frontmatter2.id()); // Ids should be different
     }
 }
