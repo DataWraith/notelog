@@ -1,0 +1,1 @@
+CREATE INDEX note_id_idx ON notes(json_extract(metadata, '$.id'));
