@@ -3,6 +3,7 @@ mod tests {
     use crate::core::frontmatter::Frontmatter;
     use crate::core::note::Note;
     use crate::core::tags::Tag;
+    use std::str::FromStr;
     use crate::db::{
         DB_FILENAME, Database, delete_notes_by_filepaths, get_all_note_filepaths,
         index_notes_with_channel,
@@ -166,6 +167,85 @@ mod tests {
             // Verify no notes remain in the database
             let filepaths = get_all_note_filepaths(db.pool()).await.unwrap();
             assert_eq!(filepaths.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_find_shortest_unique_id_prefix() {
+        // Create a temporary directory for testing
+        let temp_dir = TempDir::new().unwrap();
+        let notes_dir = temp_dir.path();
+
+        // Create a tokio runtime for testing
+        let rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            // Create year/month directories
+            let year_dir = notes_dir.join("2025");
+            let month_dir = year_dir.join("05");
+            fs::create_dir_all(&month_dir).unwrap();
+
+            // Create three test notes with different IDs
+            // We'll create the notes with YAML frontmatter that includes the IDs
+            // Note 1: ID starts with "abcd1234"
+            let id1 = "abcd1234efgh0000";
+            let yaml1 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id1);
+            let frontmatter1 = yaml1.parse::<Frontmatter>().unwrap();
+            let content1 = "# Test Note 1\nThis is the first test note.";
+            let note1 = Note::new(frontmatter1.clone(), content1.to_string());
+
+            // Note 2: ID starts with "abcd5678"
+            let id2 = "abcd5678efgh0000";
+            let yaml2 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id2);
+            let frontmatter2 = yaml2.parse::<Frontmatter>().unwrap();
+            let content2 = "# Test Note 2\nThis is the second test note.";
+            let note2 = Note::new(frontmatter2.clone(), content2.to_string());
+
+            // Note 3: ID starts with "wxyz"
+            let id3 = "wxyz1234efgh0000";
+            let yaml3 = format!("id: {}\ncreated: 2025-04-01T12:00:00+00:00", id3);
+            let frontmatter3 = yaml3.parse::<Frontmatter>().unwrap();
+            let content3 = "# Test Note 3\nThis is the third test note.";
+            let note3 = Note::new(frontmatter3.clone(), content3.to_string());
+
+            // Save the notes to disk
+            let _note_path1 = note1.save(notes_dir, Some("Test Note 1")).unwrap();
+            let _note_path2 = note2.save(notes_dir, Some("Test Note 2")).unwrap();
+            let _note_path3 = note3.save(notes_dir, Some("Test Note 3")).unwrap();
+
+            // Initialize the database
+            let db = Database::initialize(notes_dir).await.unwrap();
+
+            // Run the indexing task
+            index_notes_with_channel(db.pool().clone(), notes_dir)
+                .await
+                .unwrap();
+
+            // Test 1: Find shortest unique prefix for id1
+            // Since id1 and id2 both start with "abcd", we need more characters to distinguish them
+            let id1_obj = frontmatter1.id().unwrap();
+            let prefix1 = db.find_shortest_unique_id_prefix(id1_obj).await.unwrap();
+            assert_eq!(prefix1.len(), 5); // "abcd1" should be unique
+            assert_eq!(&prefix1, "abcd1");
+
+            // Test 2: Find shortest unique prefix for id2
+            // Since id1 and id2 both start with "abcd", we need more characters to distinguish them
+            let id2_obj = frontmatter2.id().unwrap();
+            let prefix2 = db.find_shortest_unique_id_prefix(id2_obj).await.unwrap();
+            assert_eq!(prefix2.len(), 5); // "abcd5" should be unique
+            assert_eq!(&prefix2, "abcd5");
+
+            // Test 3: Find shortest unique prefix for id3
+            // Since id3 starts with "wxyz" which is unique, we should get the minimum length (4)
+            let id3_obj = frontmatter3.id().unwrap();
+            let prefix3 = db.find_shortest_unique_id_prefix(id3_obj).await.unwrap();
+            assert_eq!(prefix3.len(), 2); // "wxyz" should be unique, but we return at least 4 chars
+            assert_eq!(&prefix3, "wx");
+
+            // Test 4: Try to find prefix for non-existent ID
+            let nonexistent_id = crate::core::id::Id::from_str("nonexistent00000").unwrap();
+            let result = db.find_shortest_unique_id_prefix(&nonexistent_id).await;
+            assert!(result.is_err());
         });
     }
 

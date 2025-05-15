@@ -34,6 +34,77 @@ pub struct Database {
 }
 
 impl Database {
+    /// Find the shortest unique prefix of a given ID
+    ///
+    /// This function uses the note_id_idx index to find the shortest prefix of the given ID
+    /// that uniquely identifies a note in the database. It will always return at least
+    /// 2 characters, even if a shorter prefix would be unique.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` - The Id struct to find a unique prefix for
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - The shortest unique prefix of the ID (minimum 2 characters)
+    /// * `Err` - If an error occurs or if the ID doesn't exist in the database
+    pub async fn find_shortest_unique_id_prefix(&self, id: &crate::core::id::Id) -> Result<String> {
+        // Minimum prefix length is 2 characters
+        const MIN_PREFIX_LENGTH: usize = 2;
+
+        // Get the string representation of the ID
+        let id_str = id.as_str();
+
+        // Ensure the ID is at least the minimum length
+        if id_str.len() < MIN_PREFIX_LENGTH {
+            return Err(DatabaseError::QueryError(format!("ID is too short: {}", id_str)).into());
+        }
+
+        // Check if the full ID exists in the database
+        let exists = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM notes
+            WHERE json_extract(metadata, '$.id') = ?
+            "#
+        )
+        .bind(id_str)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        if exists == 0 {
+            return Err(DatabaseError::QueryError(format!("ID not found: {}", id_str)).into());
+        }
+
+        // Start with the minimum prefix length and increase until we find a unique prefix
+        for prefix_len in MIN_PREFIX_LENGTH..=id_str.len() {
+            let prefix = &id_str[0..prefix_len];
+
+            // Count how many notes have an ID that starts with this prefix
+            let count = sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT COUNT(*)
+                FROM notes
+                WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+                "#
+            )
+            .bind(prefix)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+            // If there's only one match, we've found the shortest unique prefix
+            if count == 1 {
+                return Ok(prefix.to_string());
+            }
+        }
+
+        // If we've gone through the entire ID and still don't have a unique prefix,
+        // return the full ID (this should never happen if the ID exists and is unique)
+        Ok(id_str.to_string())
+    }
+
     /// Initialize the database
     ///
     /// This will create the database file if it doesn't exist and run migrations.
