@@ -128,11 +128,14 @@ impl NotelogMCP {
         // Save the note
         match note.save(&self.notes_dir, None) {
             Ok(relative_path) => {
-                // Return the relative path as the success message
+                // Get the note ID from the frontmatter
+                let id = note.frontmatter().id().expect("Note should have an ID");
+
+                // Return the ID in the success message
                 // The file monitoring system will automatically detect and process the new file
                 Ok(CallToolResult::success(vec![Content::text(format!(
-                    "Note added successfully: {}",
-                    relative_path.display()
+                    "Note added successfully. ID: {}",
+                    id
                 ))]))
             }
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
