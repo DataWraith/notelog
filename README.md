@@ -9,7 +9,9 @@ Notes are stored in a local directory as Markdown files with YAML frontmatter, o
 
 ## Installation
 
-No pre-built binaries are provided at this time. To install:
+If you're on Linux (x86-64), you can download a pre-built executable from the [Releases](https://github.com/DataWraith/notelog/releases) page.
+
+To install from source:
 
 1. Clone this repository
 2. Build and install with `cargo install --path .`
