@@ -67,7 +67,7 @@ Notelog maintains an SQLite database in the specified notes directory for use as
 
 ### Model Context Protocol Server
 
-When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
+Notelog can act as a server that receives commands from AI assistants, allowing you to create or search notes using natural language (see examples below).
 
 #### JSON Configuration
 
@@ -85,6 +85,11 @@ When running in MCP mode, Notelog acts as a server that can receive commands fro
   }
 }
 ```
+
+##### How to use the JSON Configuration
+
+* [Claude Desktop tutorial](https://modelcontextprotocol.info/docs/quickstart/user/)
+* [Cursor IDE tutorial](https://docs.cursor.com/context/model-context-protocol)
 
 #### Creating Notes
 
