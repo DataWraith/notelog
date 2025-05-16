@@ -516,4 +516,94 @@ mod query_tests {
         assert_eq!(process_search_query(""), "");
         assert_eq!(process_search_query("   "), "");
     }
+
+    #[test]
+    fn test_process_search_query_with_single_backslash() {
+        // Test query with a single backslash
+        assert_eq!(process_search_query("search\\term"), "search\\term");
+    }
+
+    #[test]
+    fn test_process_search_query_with_double_backslash() {
+        // Test query with double backslashes
+        assert_eq!(process_search_query("search\\\\term"), "search\\\\term");
+    }
+
+    #[test]
+    fn test_process_search_query_with_triple_backslash() {
+        // Test query with triple backslashes
+        assert_eq!(process_search_query("search\\\\\\term"), "search\\\\\\term");
+    }
+
+    #[test]
+    fn test_process_search_query_with_quadruple_backslash() {
+        // Test query with quadruple backslashes
+        assert_eq!(process_search_query("search\\\\\\\\term"), "search\\\\\\\\term");
+    }
+
+    #[test]
+    fn test_process_search_query_with_backslash_quote() {
+        // Test query with backslash followed by a quote
+        assert_eq!(process_search_query("search\\\"term"), "search\\\"\"term");
+    }
+
+    #[test]
+    fn test_process_search_query_with_trailing_backslash() {
+        // Test query with a backslash at the end
+        assert_eq!(process_search_query("search\\"), "search\\");
+    }
+
+    #[test]
+    fn test_process_search_query_with_multiple_words_with_backslashes() {
+        // Test query with multiple words containing backslashes
+        assert_eq!(
+            process_search_query("search\\term another\\\\term"),
+            "search\\term another\\\\term"
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_tag_and_backslashes() {
+        // Test query with tag prefix and backslashes
+        assert_eq!(
+            process_search_query("+tag\\value +another\\\\tag"),
+            "\"+tag\\value\" \"+another\\\\tag\""
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_backslash_escaping_space() {
+        // Test query with backslash escaping a space
+        assert_eq!(
+            process_search_query("search\\ term"),
+            "search\\ term"
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_backslash_escaping_plus() {
+        // Test query with backslash escaping a plus sign
+        assert_eq!(
+            process_search_query("search\\+term"),
+            "search\\+term"
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_complex_backslash_patterns() {
+        // Test query with complex backslash patterns
+        assert_eq!(
+            process_search_query("search\\\\\\\"term\\\\"),
+            "search\\\\\\\"\"term\\\\"
+        );
+    }
+
+    #[test]
+    fn test_process_search_query_with_backslash_in_quoted_string() {
+        // Test query with backslashes inside quoted strings
+        assert_eq!(
+            process_search_query("\"search\\term\" \"another\\\\term\""),
+            "\"\"search\\term\"\" \"\"another\\\\term\"\""
+        );
+    }
 }
