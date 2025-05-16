@@ -6,24 +6,11 @@ This server allows you to record and search Markdown notes with tags.
 
 Use the `add_note` tool to create new notes in order to capture the user's thoughts, todos, accomplishments, etc. or summarize the conversation history.
 
-- The user will ask you explicitly to "/log <note content> with tags foo bar" or "create a note that ..." or 'Add a notelog: "..."'.
-- If the user does not ask you to act yourself, use the text the user provides verbatim (modulo spelling errors).
-- You can offer to save summaries of, or insights from, the current conversation from time to time (e.g. when a decision is reached or some task is accomplished).
-
-### Title
-
-1. If the note is short, omit the title
-2. Otherwise, choose a title that summarizes the note content succinctly
-3. Avoid characters that are invalid in filenames (':', '?', etc.) in the title
-
-### Tags
-
-- If the user asks you to add a note, but does not specify tags, choose 2-3 tags that are relevant to the content of the note.
-- Prefer tags that don't already appear in the note content as words.
+The user will ask you explicitly to "/log <note content> +tag1 +tag2" or "create a note that ..." or 'Add a notelog with tags X, Y, Z: "<note content>"'.
 
 ## Searching Notes
 
-Use the `search_notes` tool to find notes using fulltext search. This allows searching both note content and tags.
+Use the `search_notes` tool to find notes using tag and/or fulltext search.
 
 The user might ask:
 
@@ -32,9 +19,6 @@ The user might ask:
 - "Search for notes tagged +sqlite and +til from May 2025"
 - "How many notes tagged +todo do I have?"
 
-When using search:
+## Fetching Notes
 
-1. Convert the user's request into a search query
-2. Include tag prefixes (e.g., "+project") when the user wants to search for specific tags
-3. Use date filters (`before` and `after`) when the user specifies a time range
-4. Present the results as a Markdown list or table, showing the titles and IDs of the found notes
+Use the `fetch_note` tool to retrieve a specific note by its ID. This is useful when the user wants to see the full content of a note they found through search.

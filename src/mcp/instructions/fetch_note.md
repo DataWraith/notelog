@@ -1,3 +1,5 @@
+# fetch_note
+
 To fetch a specific note by its ID prefix:
 
 1. Provide the ID prefix of the note you want to retrieve

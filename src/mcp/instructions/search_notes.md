@@ -1,7 +1,8 @@
+# search_notes
+
 To search for notes, provide a query string and optional parameters:
 
 1. `query`: A search string to find matching notes (required)
-   - Searches for content within notes
    - Use `+tag` syntax to search for specific tags (e.g., `+project`)
    - Combine content and tag searches (e.g., `meeting notes +project`)
    - You can combine terms with AND, OR and NOT operators (parenthesize as needed)
@@ -18,7 +19,7 @@ To search for notes, provide a query string and optional parameters:
 Tag search syntax:
 - Tags must start with a '+' prefix (e.g., +project)
 - Can only contain lowercase letters, numbers, and dashes
-- Cannot start or end with a dash
+- Cannot end with a dash
 
 Results are ordered by relevance to your query, with the most relevant notes appearing first.
 
@@ -34,11 +35,12 @@ Example:
 
 This will find all notes containing "meeting notes" that also have the "project" tag, created between April 1st and May 1st, 2025, and return up to 15 results.
 
-The response will be a JSON array of note objects, limited to the specified number of results (or 10 by default). Each note object contains:
+The response will be a JSON array of note objects with the following fields:
 
 - `id`: The shortest unique prefix of the note's ID
 - `title`: The title extracted from the note content
 - `tags`: An array of tags associated with the note
 - `created`: The creation date
 
-When displaying the results, create a Markdown list or table that must contain the `id` and `title` fields at a minimum.
+When displaying the results, create a Markdown list or Markdown table.
+The output must contain the `id` and `title` fields at a minimum.
