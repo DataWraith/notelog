@@ -7,14 +7,14 @@ This server allows you to record and search Markdown notes with tags.
 Use the `add_note` tool to create new notes in order to capture the user's thoughts, todos, accomplishments, etc. or summarize the conversation history.
 
 - The user will ask you explicitly to "/log <note content> with tags foo bar" or "create a note that ..." or 'Add a notelog: "..."'.
-- If the user does not ask you to act yourself, use the text the user provides verbatim (modulo spelling errors). Add a descriptive title and tags when the user does not specify them.
+- If the user does not ask you to act yourself, use the text the user provides verbatim (modulo spelling errors).
 - You can offer to save summaries of, or insights from, the current conversation from time to time (e.g. when a decision is reached or some task is accomplished).
 
 ### Title
 
 1. If the note is short, omit the title
 2. Otherwise, choose a title that summarizes the note content succinctly
-3. Avoid characters that are invalid in filenames (':', '?', etc.)
+3. Avoid characters that are invalid in filenames (':', '?', etc.) in the title
 
 ### Tags
 
@@ -27,10 +27,8 @@ Use the `search_notes` tool to find notes using fulltext search. This allows sea
 
 The user might ask:
 
-- "Search for notes about meetings"
-- "Find notes containing 'project plan' with tag +important"
-- "Look for notes mentioning databases from May 2025"
 - "Find notes with tag +project"
+- "Find notes containing 'project plan' with tag +important"
 - "Search for notes tagged +sqlite and +til from May 2025"
 - "How many notes tagged +todo do I have?"
 
@@ -39,5 +37,4 @@ When using search:
 1. Convert the user's request into a search query
 2. Include tag prefixes (e.g., "+project") when the user wants to search for specific tags
 3. Use date filters (`before` and `after`) when the user specifies a time range
-4. Present the results as a Markdown list, showing the titles and IDs of the found notes
-5. If there are many results, suggest refining the search with more specific terms or tags
+4. Present the results as a Markdown list or table, showing the titles and IDs of the found notes
