@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.5.0'></a>
+# 0.5.0 — 2025-05-16
+
+## Changed
+
+- Notes now have an explicit ID (a long alphanumeric string) that can be used to stably identify a note for fetching.
+
+## Fixed
+
+- Notes returned via the search tool are now ordered by relevance instead of by ID
+
 <a id='changelog-0.4.0'></a>
 # 0.4.0 — 2025-05-14
 
