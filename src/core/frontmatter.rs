@@ -32,6 +32,15 @@ impl Frontmatter {
         }
     }
 
+    /// Create a new frontmatter with the given creation timestamp, tags, and ID
+    pub fn with_id(created: DateTime<Local>, tags: Vec<Tag>, id: Id) -> Self {
+        Self {
+            created,
+            tags,
+            id: Some(id),
+        }
+    }
+
     /// Create a new frontmatter with the current timestamp and given tags
     /// A random Id will be generated automatically
     pub fn with_tags(tags: Vec<Tag>) -> Self {

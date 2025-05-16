@@ -1,4 +1,7 @@
+use std::collections::HashSet;
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local};
@@ -66,6 +69,28 @@ pub struct SearchNotesRequest {
     )]
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+/// Request structure for the EditTags tool
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct EditTagsRequest {
+    /// The ID prefix of the note to edit
+    #[schemars(description = "A unique prefix of the ID of the note to edit")]
+    pub id: String,
+
+    /// Tags to add to the note
+    #[schemars(
+        description = "Tags to add to the note (can be empty). Tags should start with '+' and can only contain lowercase letters, numbers, and dashes."
+    )]
+    #[serde(default)]
+    pub add: Vec<String>,
+
+    /// Tags to remove from the note
+    #[schemars(
+        description = "Tags to remove from the note (can be empty). Tags should start with '+' and can only contain lowercase letters, numbers, and dashes."
+    )]
+    #[serde(default)]
+    pub remove: Vec<String>,
 }
 
 /// NotelogMCP tools for interacting with notes via MCP
@@ -198,6 +223,192 @@ impl NotelogMCP {
                 // Generic error handling
                 Ok(CallToolResult::error(vec![Content::text(format!(
                     "Error fetching note: {}",
+                    e
+                ))]))
+            }
+        }
+    }
+
+    /// Edit the tags of a note
+    #[tool(description = include_str!("instructions/edit_tags.md"))]
+    async fn edit_tags(
+        &self,
+        #[tool(aggr)] request: EditTagsRequest,
+    ) -> Result<CallToolResult, McpError> {
+        // Database is now always available
+        let db = &self.db;
+
+        // Validate that at least one of add or remove has tags
+        if request.add.is_empty() && request.remove.is_empty() {
+            return Ok(CallToolResult::error(vec![Content::text(
+                "At least one tag must be specified to add or remove.",
+            )]));
+        }
+
+        // Check for duplicate tags in add and remove arrays
+        let add_set: HashSet<String> = request.add.iter().cloned().collect();
+        let remove_set: HashSet<String> = request.remove.iter().cloned().collect();
+
+        // Find tags that appear in both add and remove
+        let duplicates: Vec<String> = add_set
+            .intersection(&remove_set)
+            .cloned()
+            .collect();
+
+        if !duplicates.is_empty() {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "The following tags appear in both add and remove arrays: {}",
+                duplicates.join(", ")
+            ))]));
+        }
+
+        // Convert add tag strings to Tag objects
+        let mut tags_to_add = Vec::new();
+        for tag_str in &request.add {
+            match Tag::new(tag_str) {
+                Ok(tag) => tags_to_add.push(tag),
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Invalid tag to add: {}", e
+                    ))]));
+                }
+            }
+        }
+
+        // Convert remove tag strings to Tag objects
+        let mut tags_to_remove = Vec::new();
+        for tag_str in &request.remove {
+            match Tag::new(tag_str) {
+                Ok(tag) => tags_to_remove.push(tag),
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Invalid tag to remove: {}", e
+                    ))]));
+                }
+            }
+        }
+
+        // Get the filepath for the note
+        let filepath = match db.get_filepath_by_id_prefix(&request.id).await {
+            Ok(Some(path)) => path,
+            Ok(None) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Note with ID prefix '{}' not found.",
+                    request.id
+                ))]));
+            }
+            Err(e) => {
+                // Check for the specific MultipleMatchesError
+                if let Some(error_message) = e
+                    .to_string()
+                    .strip_prefix("Database error: Multiple notes found with ID prefix ")
+                {
+                    return Ok(CallToolResult::error(vec![Content::text(format!(
+                        "Multiple notes found with ID prefix {}. Please provide a longer prefix.",
+                        error_message
+                    ))]));
+                }
+
+                // Generic error handling
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error fetching note: {}",
+                    e
+                ))]));
+            }
+        };
+
+        // Get the absolute path to the note file
+        let absolute_path = self.notes_dir.join(&filepath);
+
+        // Read the file content
+        let content = match fs::read_to_string(&absolute_path) {
+            Ok(content) => content,
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error reading note file: {}",
+                    e
+                ))]));
+            }
+        };
+
+        // Parse the note
+        let mut note = match Note::from_str(&content) {
+            Ok(note) => note,
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error parsing note: {}",
+                    e
+                ))]));
+            }
+        };
+
+        // If the note doesn't have an ID, generate one by creating a new frontmatter
+        if note.frontmatter().id().is_none() {
+            // Create a new frontmatter with the same created timestamp and tags, but with a new ID
+            let new_frontmatter = Frontmatter::new(
+                *note.frontmatter().created(),
+                note.frontmatter().tags().to_vec()
+            );
+
+            // Replace the frontmatter in the note
+            let content = note.content().to_string();
+            note = Note::new(new_frontmatter, content);
+        }
+
+        // Create a new note with an empty set of tags but preserving the ID and timestamp
+        let mut new_note = Note::new(
+            Frontmatter::new(*note.frontmatter().created(), Vec::new()),
+            note.content().to_string()
+        );
+
+        // If the original note had an ID, we need to preserve it
+        if let Some(id) = note.frontmatter().id() {
+            // Create a new frontmatter with the same ID and timestamp but no tags
+            new_note = Note::new(
+                Frontmatter::with_id(*note.frontmatter().created(), Vec::new(), id.clone()),
+                note.content().to_string()
+            );
+        }
+
+        // Add all existing tags that are not in the remove list
+        for tag in note.frontmatter().tags() {
+            if !tags_to_remove.contains(tag) {
+                new_note.frontmatter_mut().add_tag(tag.clone());
+            }
+        }
+
+        // Add all new tags
+        for tag in tags_to_add {
+            new_note.frontmatter_mut().add_tag(tag);
+        }
+
+        // Use the new note for saving
+        note = new_note;
+
+        // Save the updated note
+        match fs::write(&absolute_path, note.formatted_content()) {
+            Ok(_) => {
+                // Extract tags from the updated note
+                let tags: Vec<String> = note
+                    .frontmatter()
+                    .tags()
+                    .iter()
+                    .map(|tag| tag.as_str().to_string())
+                    .collect();
+
+                // Create a success message with the updated tags
+                let message = if tags.is_empty() {
+                    format!("Tags updated successfully. The note now has no tags.")
+                } else {
+                    format!("Tags updated successfully. The note now has the following tags: {}",
+                            tags.join(", "))
+                };
+
+                Ok(CallToolResult::success(vec![Content::text(message)]))
+            }
+            Err(e) => {
+                Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error writing note file: {}",
                     e
                 ))]))
             }

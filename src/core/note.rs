@@ -33,6 +33,11 @@ impl Note {
         &self.frontmatter
     }
 
+    /// Get a mutable reference to the frontmatter of the note
+    pub fn frontmatter_mut(&mut self) -> &mut Frontmatter {
+        &mut self.frontmatter
+    }
+
     /// Get the content of the note
     pub fn content(&self) -> &str {
         &self.content

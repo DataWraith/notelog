@@ -1,6 +1,6 @@
 # NoteLog
 
-This server allows you to record and search Markdown notes with tags.
+This server allows you to record, search, and manage Markdown notes with tags.
 
 ## Creating Notes
 
@@ -22,3 +22,13 @@ The user might ask:
 ## Fetching Notes
 
 Use the `fetch_note` tool to retrieve a specific note by its ID. This is useful when the user wants to see the full content of a note they found through search.
+
+## Editing Tags
+
+Use the `edit_tags` tool to add or remove tags from an existing note. This allows the user to organize their notes better over time.
+
+The user might ask:
+
+- "Add tags +important and +project to note abc123"
+- "Remove the +draft tag from note xyz456"
+- "Mark note def789 as done" (This should remove the +todo tag and add the +done tag)

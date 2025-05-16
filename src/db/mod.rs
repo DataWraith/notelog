@@ -296,6 +296,58 @@ impl Database {
         }
     }
 
+    /// Get the filepath of a note by its ID prefix
+    ///
+    /// This function searches for notes with IDs that start with the provided prefix
+    /// and returns the filepath of the matching note.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(String))` - If exactly one note is found with the given ID prefix, returns its filepath
+    /// * `Ok(None)` - If no notes are found with the given ID prefix
+    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
+    pub async fn get_filepath_by_id_prefix(&self, id_prefix: &str) -> Result<Option<String>> {
+        // Count how many notes have an ID that starts with this prefix
+        let count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM notes
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#,
+        )
+        .bind(id_prefix)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // If no notes match, return None
+        if count == 0 {
+            return Ok(None);
+        }
+
+        // If multiple notes match, return an error with the count
+        if count > 1 {
+            return Err(
+                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
+            );
+        }
+
+        // If exactly one note matches, fetch its filepath
+        let filepath = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT filepath
+            FROM notes
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#,
+        )
+        .bind(id_prefix)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(filepath)
+    }
+
     /// Find the shortest unique prefix of a given ID
     ///
     /// This function uses the note_id_idx index to find the shortest prefix of the given ID
