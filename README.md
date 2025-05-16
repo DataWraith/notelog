@@ -112,5 +112,4 @@ The search supports:
 - Date filtering (e.g., "from May 2025")
 - Combinations of the above
 
-To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs will be returned. The LLM can then use these IDs to retrieve the note contents on request.
-
+To avoid bloating the context window too much, a maximum of 25 notes with their IDs will be returned. The LLM can then use the IDs to retrieve the note contents on request.
