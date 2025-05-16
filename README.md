@@ -69,7 +69,7 @@ Notelog maintains an SQLite database in the specified notes directory for use as
 
 Notelog can act as a server that receives commands from AI assistants, allowing you to create or search notes using natural language (see examples below).
 
-#### JSON Configuration
+#### JSON Configuration Example
 
 ```json
 {
@@ -86,7 +86,7 @@ Notelog can act as a server that receives commands from AI assistants, allowing 
 }
 ```
 
-##### How to use the JSON Configuration
+##### Configuration Tutorials
 
 * [Claude Desktop tutorial](https://modelcontextprotocol.info/docs/quickstart/user/)
 * [Cursor IDE tutorial](https://docs.cursor.com/context/model-context-protocol)
