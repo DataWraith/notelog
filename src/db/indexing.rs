@@ -50,6 +50,20 @@ pub async fn is_valid_note_file(path: &Path) -> bool {
     true
 }
 
+/// Get all note filepaths from the database
+pub async fn get_all_note_filepaths(pool: &Pool<Sqlite>) -> Result<Vec<String>> {
+    let filepaths = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT filepath FROM notes
+    "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+    Ok(filepaths)
+}
+
 /// Index all notes in the notes directory using channels
 pub async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
     // First, get all existing note filepaths from the database
@@ -104,81 +118,6 @@ pub async fn index_notes_with_channel(pool: Pool<Sqlite>, notes_dir: &Path) -> R
             eprintln!("Error deleting notes from database: {}", e);
         }
     }
-
-    Ok(())
-}
-
-/// Collect note files and send them to a channel
-async fn collect_note_files_with_channel(
-    notes_dir: &Path,
-    tx: tokio::sync::mpsc::Sender<PathBuf>,
-) -> Result<()> {
-    // Process the current directory
-    let mut entries = fs::read_dir(notes_dir).await?;
-
-    // First, collect all entries at this level
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-        let metadata = fs::metadata(&path).await?;
-
-        if metadata.is_dir() {
-            // Process subdirectories recursively using Box::pin to avoid infinite size
-            Box::pin(collect_note_files_with_channel(&path, tx.clone())).await?;
-            continue;
-        }
-
-        if is_valid_note_file(&path).await {
-            // Send valid note files to the channel
-            if let Err(e) = tx.send(path).await {
-                eprintln!("Error sending file path to channel: {}", e);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Get all note filepaths from the database
-pub async fn get_all_note_filepaths(pool: &Pool<Sqlite>) -> Result<Vec<String>> {
-    let filepaths = sqlx::query_scalar::<_, String>(
-        r#"
-        SELECT filepath FROM notes
-    "#,
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-    Ok(filepaths)
-}
-
-/// Delete notes from the database by their filepaths
-pub async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]) -> Result<()> {
-    // Use a transaction to ensure all deletions are atomic
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-    for filepath in filepaths {
-        // The after_note_delete trigger will handle removing tag relationships
-        // and updating tag usage counts
-        sqlx::query(
-            r#"
-            DELETE FROM notes
-            WHERE filepath = ?
-        "#,
-        )
-        .bind(filepath)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-    }
-
-    // Commit the transaction
-    tx.commit()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     Ok(())
 }
@@ -273,6 +212,67 @@ pub async fn process_note_file(
         .execute(pool)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    }
+
+    Ok(())
+}
+
+/// Delete notes from the database by their filepaths
+pub async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]) -> Result<()> {
+    // Use a transaction to ensure all deletions are atomic
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+    for filepath in filepaths {
+        // The after_note_delete trigger will handle removing tag relationships
+        // and updating tag usage counts
+        sqlx::query(
+            r#"
+            DELETE FROM notes
+            WHERE filepath = ?
+        "#,
+        )
+        .bind(filepath)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    }
+
+    // Commit the transaction
+    tx.commit()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Collect note files and send them to a channel
+async fn collect_note_files_with_channel(
+    notes_dir: &Path,
+    tx: tokio::sync::mpsc::Sender<PathBuf>,
+) -> Result<()> {
+    // Process the current directory
+    let mut entries = fs::read_dir(notes_dir).await?;
+
+    // First, collect all entries at this level
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        let metadata = fs::metadata(&path).await?;
+
+        if metadata.is_dir() {
+            // Process subdirectories recursively using Box::pin to avoid infinite size
+            Box::pin(collect_note_files_with_channel(&path, tx.clone())).await?;
+            continue;
+        }
+
+        if is_valid_note_file(&path).await {
+            // Send valid note files to the channel
+            if let Err(e) = tx.send(path).await {
+                eprintln!("Error sending file path to channel: {}", e);
+            }
+        }
     }
 
     Ok(())

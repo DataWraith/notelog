@@ -44,15 +44,6 @@ impl Frontmatter {
         Self::with_tags(vec![])
     }
 
-    /// Add a tag to the frontmatter
-    pub fn add_tag(&mut self, tag: Tag) {
-        if self.tags.contains(&tag) {
-            return;
-        }
-
-        self.tags.push(tag);
-    }
-
     /// Get the creation timestamp
     #[allow(dead_code)]
     pub fn created(&self) -> &DateTime<Local> {
@@ -67,6 +58,39 @@ impl Frontmatter {
     /// Get the id if present
     pub fn id(&self) -> Option<&Id> {
         self.id.as_ref()
+    }
+
+    /// Add a tag to the frontmatter
+    pub fn add_tag(&mut self, tag: Tag) {
+        if self.tags.contains(&tag) {
+            return;
+        }
+
+        self.tags.push(tag);
+    }
+
+    /// Apply frontmatter to content
+    pub fn apply_to_content(&self, content: &str) -> String {
+        format!("{}\n\n{}\n\n", self.to_yaml(), content)
+    }
+
+    /// Extract frontmatter from content if present
+    pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
+        // Extract YAML and content
+        match Self::extract_yaml_and_content(content) {
+            Ok((Some(yaml), content_without_frontmatter)) => {
+                // Parse the YAML
+                match Self::from_str(&yaml) {
+                    Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
+                    Err(e) => Err(e),
+                }
+            }
+            Ok((None, content_without_frontmatter)) => {
+                // No frontmatter or empty frontmatter
+                Ok((None, content_without_frontmatter))
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Format the frontmatter as a YAML string
@@ -93,11 +117,6 @@ impl Frontmatter {
         };
 
         format!("---\n{}{}{}\n---", id_yaml, created_yaml, tags_yaml)
-    }
-
-    /// Apply frontmatter to content
-    pub fn apply_to_content(&self, content: &str) -> String {
-        format!("{}\n\n{}\n\n", self.to_yaml(), content)
     }
 
     /// Helper function to extract YAML frontmatter and content from a document
@@ -131,25 +150,6 @@ impl Frontmatter {
 
         // Should not reach here, but just in case
         Ok((None, content.to_string()))
-    }
-
-    /// Extract frontmatter from content if present
-    pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
-        // Extract YAML and content
-        match Self::extract_yaml_and_content(content) {
-            Ok((Some(yaml), content_without_frontmatter)) => {
-                // Parse the YAML
-                match Self::from_str(&yaml) {
-                    Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
-                    Err(e) => Err(e),
-                }
-            }
-            Ok((None, content_without_frontmatter)) => {
-                // No frontmatter or empty frontmatter
-                Ok((None, content_without_frontmatter))
-            }
-            Err(e) => Err(e),
-        }
     }
 }
 

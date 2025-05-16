@@ -43,49 +43,6 @@ impl Note {
         format!("{}\n\n{}\n\n", self.frontmatter, self.content.trim_end())
     }
 
-    /// Extract title from the note content
-    pub fn extract_title(&self) -> String {
-        // Find the first non-empty line in the content
-        let mut title = self
-            .content
-            .lines()
-            .find(|line| !line.trim().is_empty())
-            .unwrap_or("")
-            .trim()
-            .to_string();
-
-        // Remove leading '#' characters (indicating a Markdown header) from the
-        // title. If the note starts with a Markdown list indicated by "- " or
-        // "* ", remove that as well.
-        if title.starts_with('#') {
-            title = title.trim_start_matches('#').trim().to_string();
-        } else if title.starts_with("- ") {
-            title = title
-                .strip_prefix("- ")
-                .unwrap_or(&title)
-                .trim()
-                .to_string();
-        } else if title.starts_with("* ") {
-            title = title
-                .strip_prefix("* ")
-                .unwrap_or(&title)
-                .trim()
-                .to_string();
-        }
-
-        // Remove any trailing periods (so we don't end up with "Title..md")
-        while title.ends_with('.') {
-            title.pop();
-        }
-
-        // Truncate to 100 characters maximum
-        if title.len() > 100 {
-            title.truncate(100);
-        }
-
-        title
-    }
-
     /// Save the note to disk in the appropriate directory
     ///
     /// Returns the path to the saved note file, relative to the notes_dir
@@ -131,6 +88,49 @@ impl Note {
 
         // Return the relative path
         Ok(relative_path)
+    }
+
+    /// Extract title from the note content
+    pub fn extract_title(&self) -> String {
+        // Find the first non-empty line in the content
+        let mut title = self
+            .content
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
+        // Remove leading '#' characters (indicating a Markdown header) from the
+        // title. If the note starts with a Markdown list indicated by "- " or
+        // "* ", remove that as well.
+        if title.starts_with('#') {
+            title = title.trim_start_matches('#').trim().to_string();
+        } else if title.starts_with("- ") {
+            title = title
+                .strip_prefix("- ")
+                .unwrap_or(&title)
+                .trim()
+                .to_string();
+        } else if title.starts_with("* ") {
+            title = title
+                .strip_prefix("* ")
+                .unwrap_or(&title)
+                .trim()
+                .to_string();
+        }
+
+        // Remove any trailing periods (so we don't end up with "Title..md")
+        while title.ends_with('.') {
+            title.pop();
+        }
+
+        // Truncate to 100 characters maximum
+        if title.len() > 100 {
+            title.truncate(100);
+        }
+
+        title
     }
 }
 

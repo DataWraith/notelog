@@ -21,64 +21,6 @@ pub fn get_notes_dir(notes_dir: Option<PathBuf>) -> Result<PathBuf> {
         })
 }
 
-/// Ensure the notes directory exists and is writable
-pub fn ensure_notes_dir_exists(notes_dir: &Path) -> Result<()> {
-    if !notes_dir.exists() {
-        return Err(NotelogError::NotesDirectoryNotFound(format!(
-            "Directory does not exist: {}",
-            notes_dir.display()
-        )));
-    } else if !notes_dir.is_dir() {
-        return Err(NotelogError::NotesDirectoryNotFound(format!(
-            "{} is not a directory",
-            notes_dir.display()
-        )));
-    }
-
-    // Check if the directory is writable by attempting to create a temporary file
-    let temp_file_path = notes_dir.join(".notelog_write_test");
-    match File::create(&temp_file_path) {
-        Ok(_) => {
-            // Clean up the test file
-            let _ = fs::remove_file(temp_file_path);
-            Ok(())
-        }
-        Err(e) => Err(NotelogError::NotesDirectoryNotWritable(format!(
-            "{}: {}",
-            notes_dir.display(),
-            e
-        ))),
-    }
-}
-
-/// Create the year and month directories for the note
-pub fn create_date_directories(notes_dir: &Path, date: &DateTime<Local>) -> Result<PathBuf> {
-    let year = date.year();
-    let month = date.month();
-    let month_name = match month {
-        1 => "01_January",
-        2 => "02_February",
-        3 => "03_March",
-        4 => "04_April",
-        5 => "05_May",
-        6 => "06_June",
-        7 => "07_July",
-        8 => "08_August",
-        9 => "09_September",
-        10 => "10_October",
-        11 => "11_November",
-        12 => "12_December",
-        _ => unreachable!(),
-    };
-
-    let year_dir = notes_dir.join(year.to_string());
-    let month_dir = year_dir.join(month_name);
-
-    fs::create_dir_all(&month_dir)?;
-
-    Ok(month_dir)
-}
-
 /// Generate a valid filename from a title
 pub fn generate_filename(date: &DateTime<Local>, title: &str, counter: Option<usize>) -> String {
     let date_str = date.format("%Y-%m-%dT%H-%M").to_string();
@@ -118,6 +60,64 @@ pub fn validate_content(content: &[u8]) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Create the year and month directories for the note
+pub fn create_date_directories(notes_dir: &Path, date: &DateTime<Local>) -> Result<PathBuf> {
+    let year = date.year();
+    let month = date.month();
+    let month_name = match month {
+        1 => "01_January",
+        2 => "02_February",
+        3 => "03_March",
+        4 => "04_April",
+        5 => "05_May",
+        6 => "06_June",
+        7 => "07_July",
+        8 => "08_August",
+        9 => "09_September",
+        10 => "10_October",
+        11 => "11_November",
+        12 => "12_December",
+        _ => unreachable!(),
+    };
+
+    let year_dir = notes_dir.join(year.to_string());
+    let month_dir = year_dir.join(month_name);
+
+    fs::create_dir_all(&month_dir)?;
+
+    Ok(month_dir)
+}
+
+/// Ensure the notes directory exists and is writable
+pub fn ensure_notes_dir_exists(notes_dir: &Path) -> Result<()> {
+    if !notes_dir.exists() {
+        return Err(NotelogError::NotesDirectoryNotFound(format!(
+            "Directory does not exist: {}",
+            notes_dir.display()
+        )));
+    } else if !notes_dir.is_dir() {
+        return Err(NotelogError::NotesDirectoryNotFound(format!(
+            "{} is not a directory",
+            notes_dir.display()
+        )));
+    }
+
+    // Check if the directory is writable by attempting to create a temporary file
+    let temp_file_path = notes_dir.join(".notelog_write_test");
+    match File::create(&temp_file_path) {
+        Ok(_) => {
+            // Clean up the test file
+            let _ = fs::remove_file(temp_file_path);
+            Ok(())
+        }
+        Err(e) => Err(NotelogError::NotesDirectoryNotWritable(format!(
+            "{}: {}",
+            notes_dir.display(),
+            e
+        ))),
+    }
 }
 
 /// Open an editor for the user to write a note

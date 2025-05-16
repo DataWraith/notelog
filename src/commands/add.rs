@@ -26,6 +26,36 @@ pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Resu
     Ok(relative_path)
 }
 
+/// Helper function to add a markdown header to content if a title is provided and content doesn't already have a header
+///
+/// Returns a tuple of (content, title_override) where:
+/// - content is the possibly modified content with a header
+/// - title_override is the title that was passed in, if any
+fn add_title_to_content(
+    content: String,
+    title: Option<&String>,
+    tags: &[Tag],
+) -> Result<(Note, Option<String>)> {
+    if let Some(title) = title {
+        // Check if the content already has a markdown header
+        if !content.trim_start().starts_with('#') {
+            return Ok((
+                Note::new(
+                    Frontmatter::with_tags(tags.to_vec()),
+                    format!("# {}\n\n{}", title, content),
+                ),
+                Some(title.clone()),
+            ));
+        }
+    }
+
+    // No title provided or content already has a header
+    Ok((
+        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
+        title.cloned(),
+    ))
+}
+
 /// Create a Note object from various input sources
 ///
 /// Returns a tuple of (Note, Option<String>) where the second element is an optional title override
@@ -93,36 +123,6 @@ pub fn create_note_from_input(
     };
 
     Ok((note, title_override))
-}
-
-/// Helper function to add a markdown header to content if a title is provided and content doesn't already have a header
-///
-/// Returns a tuple of (content, title_override) where:
-/// - content is the possibly modified content with a header
-/// - title_override is the title that was passed in, if any
-fn add_title_to_content(
-    content: String,
-    title: Option<&String>,
-    tags: &[Tag],
-) -> Result<(Note, Option<String>)> {
-    if let Some(title) = title {
-        // Check if the content already has a markdown header
-        if !content.trim_start().starts_with('#') {
-            return Ok((
-                Note::new(
-                    Frontmatter::with_tags(tags.to_vec()),
-                    format!("# {}\n\n{}", title, content),
-                ),
-                Some(title.clone()),
-            ));
-        }
-    }
-
-    // No title provided or content already has a header
-    Ok((
-        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
-        title.cloned(),
-    ))
 }
 
 /// Opens an editor for the user to create a note, with optional title and tags

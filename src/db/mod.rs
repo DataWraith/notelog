@@ -34,77 +34,6 @@ pub struct Database {
 }
 
 impl Database {
-    /// Find the shortest unique prefix of a given ID
-    ///
-    /// This function uses the note_id_idx index to find the shortest prefix of the given ID
-    /// that uniquely identifies a note in the database. It will always return at least
-    /// 2 characters, even if a shorter prefix would be unique.
-    ///
-    /// # Parameters
-    ///
-    /// * `id` - The Id struct to find a unique prefix for
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(String)` - The shortest unique prefix of the ID (minimum 2 characters)
-    /// * `Err` - If an error occurs or if the ID doesn't exist in the database
-    pub async fn find_shortest_unique_id_prefix(&self, id: &crate::core::id::Id) -> Result<String> {
-        // Minimum prefix length is 2 characters
-        const MIN_PREFIX_LENGTH: usize = 2;
-
-        // Get the string representation of the ID
-        let id_str = id.as_str();
-
-        // Ensure the ID is at least the minimum length
-        if id_str.len() < MIN_PREFIX_LENGTH {
-            return Err(DatabaseError::QueryError(format!("ID is too short: {}", id_str)).into());
-        }
-
-        // Check if the full ID exists in the database
-        let exists = sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM notes
-            WHERE json_extract(metadata, '$.id') = ?
-            "#,
-        )
-        .bind(id_str)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-        if exists == 0 {
-            return Err(DatabaseError::QueryError(format!("ID not found: {}", id_str)).into());
-        }
-
-        // Start with the minimum prefix length and increase until we find a unique prefix
-        for prefix_len in MIN_PREFIX_LENGTH..=id_str.len() {
-            let prefix = &id_str[0..prefix_len];
-
-            // Count how many notes have an ID that starts with this prefix
-            let count = sqlx::query_scalar::<_, i64>(
-                r#"
-                SELECT COUNT(*)
-                FROM notes
-                WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-                "#,
-            )
-            .bind(prefix)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-            // If there's only one match, we've found the shortest unique prefix
-            if count == 1 {
-                return Ok(prefix.to_string());
-            }
-        }
-
-        // If we've gone through the entire ID and still don't have a unique prefix,
-        // return the full ID (this should never happen if the ID exists and is unique)
-        Ok(id_str.to_string())
-    }
-
     /// Initialize the database
     ///
     /// This will create the database file if it doesn't exist and run migrations.
@@ -137,101 +66,9 @@ impl Database {
         })
     }
 
-    /// Start a background task to index all notes in the notes directory
-    pub async fn start_indexing_task(&self) -> Result<()> {
-        // Clone the pool and notes_dir for the background task
-        let pool = self.pool.clone();
-        let notes_dir = self.notes_dir.clone();
-
-        // Spawn a background task to index notes using channels
-        tokio::spawn(async move {
-            if let Err(e) = index_notes_with_channel(pool, &notes_dir).await {
-                eprintln!("Error indexing notes: {}", e);
-            }
-        });
-
-        Ok(())
-    }
-
-    /// Start a background task to monitor the notes directory for changes
-    pub async fn start_monitoring_task(&self) -> Result<()> {
-        // Clone the pool and notes_dir for the background task
-        let pool = self.pool.clone();
-        let notes_dir = self.notes_dir.clone();
-
-        // Start the file monitoring task
-        start_file_monitoring(pool, &notes_dir).await
-    }
-
     /// Get the database connection pool
     pub fn pool(&self) -> &Pool<Sqlite> {
         &self.pool
-    }
-
-    /// Fetch a note by its ID prefix
-    ///
-    /// This function searches for notes with IDs that start with the provided prefix.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Some(Note))` - If exactly one note is found with the given ID prefix
-    /// * `Ok(None)` - If no notes are found with the given ID prefix
-    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
-    pub async fn fetch_note_by_id(&self, id_prefix: &str) -> Result<Option<Note>> {
-        // Count how many notes have an ID that starts with this prefix
-        let count = sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM notes
-            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-            "#,
-        )
-        .bind(id_prefix)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-        // If no notes match, return None
-        if count == 0 {
-            return Ok(None);
-        }
-
-        // If multiple notes match, return an error with the count
-        if count > 1 {
-            return Err(
-                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
-            );
-        }
-
-        // If exactly one note matches, fetch it
-        let note_data = sqlx::query_as::<_, (String, String)>(
-            r#"
-            SELECT
-                metadata,
-                content
-            FROM notes
-            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-            "#,
-        )
-        .bind(id_prefix)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-        // This should always be Some since we checked the count above
-        if let Some((metadata_json, content)) = note_data {
-            // Parse the frontmatter from the metadata JSON
-            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
-                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
-
-            // Create a Note from the frontmatter and content
-            let note = Note::new(frontmatter, content);
-
-            Ok(Some(note))
-        } else {
-            // This should never happen, but handle it just in case
-            Ok(None)
-        }
     }
 
     /// Search for notes using fulltext search
@@ -391,6 +228,164 @@ impl Database {
         }
 
         Ok((notes, total_count as usize))
+    }
+
+    /// Fetch a note by its ID prefix
+    ///
+    /// This function searches for notes with IDs that start with the provided prefix.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(Note))` - If exactly one note is found with the given ID prefix
+    /// * `Ok(None)` - If no notes are found with the given ID prefix
+    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
+    pub async fn fetch_note_by_id(&self, id_prefix: &str) -> Result<Option<Note>> {
+        // Count how many notes have an ID that starts with this prefix
+        let count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM notes
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#,
+        )
+        .bind(id_prefix)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // If no notes match, return None
+        if count == 0 {
+            return Ok(None);
+        }
+
+        // If multiple notes match, return an error with the count
+        if count > 1 {
+            return Err(
+                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
+            );
+        }
+
+        // If exactly one note matches, fetch it
+        let note_data = sqlx::query_as::<_, (String, String)>(
+            r#"
+            SELECT
+                metadata,
+                content
+            FROM notes
+            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+            "#,
+        )
+        .bind(id_prefix)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        // This should always be Some since we checked the count above
+        if let Some((metadata_json, content)) = note_data {
+            // Parse the frontmatter from the metadata JSON
+            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
+                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+
+            // Create a Note from the frontmatter and content
+            let note = Note::new(frontmatter, content);
+
+            Ok(Some(note))
+        } else {
+            // This should never happen, but handle it just in case
+            Ok(None)
+        }
+    }
+
+    /// Find the shortest unique prefix of a given ID
+    ///
+    /// This function uses the note_id_idx index to find the shortest prefix of the given ID
+    /// that uniquely identifies a note in the database. It will always return at least
+    /// 2 characters, even if a shorter prefix would be unique.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` - The Id struct to find a unique prefix for
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - The shortest unique prefix of the ID (minimum 2 characters)
+    /// * `Err` - If an error occurs or if the ID doesn't exist in the database
+    pub async fn find_shortest_unique_id_prefix(&self, id: &crate::core::id::Id) -> Result<String> {
+        // Minimum prefix length is 2 characters
+        const MIN_PREFIX_LENGTH: usize = 2;
+
+        // Get the string representation of the ID
+        let id_str = id.as_str();
+
+        // Check if the full ID exists in the database
+        let exists = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM notes
+            WHERE json_extract(metadata, '$.id') = ?
+            "#,
+        )
+        .bind(id_str)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        if exists == 0 {
+            return Err(DatabaseError::QueryError(format!("ID not found: {}", id_str)).into());
+        }
+
+        // Start with the minimum prefix length and increase until we find a unique prefix
+        for prefix_len in MIN_PREFIX_LENGTH..=id_str.len() {
+            let prefix = &id_str[0..prefix_len];
+
+            // Count how many notes have an ID that starts with this prefix
+            let count = sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT COUNT(*)
+                FROM notes
+                WHERE json_extract(metadata, '$.id') LIKE ? || '%'
+                "#,
+            )
+            .bind(prefix)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+            // If there's only one match, we've found the shortest unique prefix
+            if count == 1 {
+                return Ok(prefix.to_string());
+            }
+        }
+
+        // If we've gone through the entire ID and still don't have a unique prefix,
+        // return the full ID (this should never happen if the ID exists and is unique)
+        Ok(id_str.to_string())
+    }
+
+    /// Start a background task to index all notes in the notes directory
+    pub async fn start_indexing_task(&self) -> Result<()> {
+        // Clone the pool and notes_dir for the background task
+        let pool = self.pool.clone();
+        let notes_dir = self.notes_dir.clone();
+
+        // Spawn a background task to index notes using channels
+        tokio::spawn(async move {
+            if let Err(e) = index_notes_with_channel(pool, &notes_dir).await {
+                eprintln!("Error indexing notes: {}", e);
+            }
+        });
+
+        Ok(())
+    }
+
+    /// Start a background task to monitor the notes directory for changes
+    pub async fn start_monitoring_task(&self) -> Result<()> {
+        // Clone the pool and notes_dir for the background task
+        let pool = self.pool.clone();
+        let notes_dir = self.notes_dir.clone();
+
+        // Start the file monitoring task
+        start_file_monitoring(pool, &notes_dir).await
     }
 }
 

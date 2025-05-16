@@ -45,11 +45,6 @@ impl Id {
         Ok(Id(processed_input))
     }
 
-    /// Get the Id as a string
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
     /// Generate a random base36 Id
     fn generate_random() -> Self {
         const CHARSET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
@@ -65,6 +60,11 @@ impl Id {
 
         // This should never fail since we're generating a valid ID
         Id(id)
+    }
+
+    /// Get the Id as a string
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
