@@ -111,10 +111,4 @@ You can search for notes using fulltext search or by specific tags:
 - `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
 
-The search supports:
-- Content search (words or phrases in the note)
-- Tag search (using the `+tag` syntax)
-- Date filtering (e.g., "from May 2025")
-- Combinations of the above
-
 To avoid bloating the context window too much, a maximum of 25 notes with their IDs will be returned. The LLM can then use the IDs to retrieve the note contents on request.
