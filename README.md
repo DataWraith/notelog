@@ -69,6 +69,23 @@ Notelog maintains an SQLite database in the specified notes directory for use as
 
 When running in MCP mode, Notelog acts as a server that can receive commands from client software that supports the protocol. This allows AI assistants to interact with Notelog directly.
 
+#### JSON Configuration
+
+```json
+{
+  "mcpServers": {
+    "notelog": {
+      "command": "notelog",
+      "args": [
+        "mcp",
+        "-d",
+        "/path/to/your/NoteLog/directory"
+      ]
+    }
+  }
+}
+```
+
 #### Creating Notes
 
 You can create notes by just asking the LLM:
@@ -97,19 +114,3 @@ The search supports:
 
 To avoid bloating the context window too much, a maximum of 25 note titles and the corresponding IDs will be returned. The LLM can then use these IDs to retrieve the note contents on request.
 
-#### JSON Configuration
-
-```json
-{
-  "mcpServers": {
-    "notelog": {
-      "command": "notelog",
-      "args": [
-        "mcp",
-        "-d",
-        "/path/to/your/NoteLog/directory"
-      ]
-    }
-  }
-}
-```
