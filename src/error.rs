@@ -41,6 +41,7 @@ pub enum FrontmatterError {
 
 /// Specific error type for database operations
 #[derive(Error, Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum DatabaseError {
     #[error("Database connection error: {0}")]
     ConnectionError(String),

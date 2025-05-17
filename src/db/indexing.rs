@@ -20,7 +20,7 @@ use crate::error::{DatabaseError, NotelogError, Result};
 /// - Be less than 50 KiB in size
 pub async fn is_valid_note_file(path: &Path) -> bool {
     // Check if it's a markdown file
-    if !path.extension().is_some_and(|ext| ext == "md") {
+    if path.extension().is_none_or(|ext| ext != "md") {
         return false;
     }
 

@@ -67,6 +67,7 @@ impl Database {
     }
 
     /// Get the database connection pool
+    #[cfg(test)]
     pub fn pool(&self) -> &Pool<Sqlite> {
         &self.pool
     }

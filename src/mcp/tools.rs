@@ -398,7 +398,7 @@ impl NotelogMCP {
 
                 // Create a success message with the updated tags
                 let message = if tags.is_empty() {
-                    format!("Tags updated successfully. The note now has no tags.")
+                    "Tags updated successfully. The note now has no tags.".to_string()
                 } else {
                     format!("Tags updated successfully. The note now has the following tags: {}",
                             tags.join(", "))
