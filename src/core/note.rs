@@ -147,14 +147,14 @@ impl Note {
                 .to_string();
         }
 
-        // Remove any trailing periods (so we don't end up with "Title..md")
-        while title.ends_with('.') {
-            title.pop();
-        }
-
         // Truncate to 100 characters maximum
         if title.len() > 100 {
             title.truncate(100);
+        }
+
+        // Remove any trailing periods (so we don't end up with "Title..md")
+        while title.ends_with('.') {
+            title.pop();
         }
 
         title
