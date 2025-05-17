@@ -385,33 +385,15 @@ impl NotelogMCP {
         }
 
         // Parse before date if provided
-        let before = if let Some(before_str) = &request.before {
-            match DateTime::parse_from_rfc3339(before_str) {
-                Ok(dt) => Some(dt.with_timezone(&Local)),
-                Err(e) => {
-                    return Ok(CallToolResult::error(vec![Content::text(format!(
-                        "Invalid 'before' date format: {}",
-                        e
-                    ))]));
-                }
-            }
-        } else {
-            None
+        let before = match self.parse_date_string(&request.before, "before") {
+            Ok(date) => date,
+            Err(e) => return Ok(e),
         };
 
         // Parse after date if provided
-        let after = if let Some(after_str) = &request.after {
-            match DateTime::parse_from_rfc3339(after_str) {
-                Ok(dt) => Some(dt.with_timezone(&Local)),
-                Err(e) => {
-                    return Ok(CallToolResult::error(vec![Content::text(format!(
-                        "Invalid 'after' date format: {}",
-                        e
-                    ))]));
-                }
-            }
-        } else {
-            None
+        let after = match self.parse_date_string(&request.after, "after") {
+            Ok(date) => date,
+            Err(e) => return Ok(e),
         };
 
         // Check for invalid date range
@@ -516,6 +498,28 @@ impl ServerHandler for NotelogMCP {
             instructions: Some(instructions.into()),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
+        }
+    }
+}
+
+impl NotelogMCP {
+    // Helper function to parse date strings.
+    // TODO: This is quite ugly.
+    fn parse_date_string(
+        &self,
+        date_str: &Option<String>,
+        field_name: &str,
+    ) -> Result<Option<DateTime<Local>>, CallToolResult> {
+        if let Some(s) = date_str {
+            match DateTime::parse_from_rfc3339(s) {
+                Ok(dt) => Ok(Some(dt.with_timezone(&Local))),
+                Err(e) => Err(CallToolResult::error(vec![Content::text(format!(
+                    "Invalid '{}' date format: {}",
+                    field_name, e
+                ))])),
+            }
+        } else {
+            Ok(None)
         }
     }
 }
