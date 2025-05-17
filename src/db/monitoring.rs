@@ -96,12 +96,12 @@ pub async fn start_file_monitoring(pool: Pool<Sqlite>, notes_dir: &Path) -> Resu
 
     // Create a watcher with the handler
     let mut watcher = RecommendedWatcher::new(handler, config)
-        .map_err(|e| DatabaseError::MonitoringError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Monitoring(e.to_string()))?;
 
     // Watch the notes directory recursively
     watcher
         .watch(notes_dir, RecursiveMode::Recursive)
-        .map_err(|e| DatabaseError::MonitoringError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Monitoring(e.to_string()))?;
 
     // Start a task to process events from the channel
     let notes_dir_clone = notes_dir.to_path_buf();

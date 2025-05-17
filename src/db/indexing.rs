@@ -59,7 +59,7 @@ pub async fn get_all_note_filepaths(pool: &Pool<Sqlite>) -> Result<Vec<String>> 
     )
     .fetch_all(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
     Ok(filepaths)
 }
@@ -156,7 +156,7 @@ pub async fn process_note_file(
     .bind(&relative_path)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
     // If the note exists and has the same mtime, skip processing
     if let Some((_, db_mtime)) = &existing {
@@ -173,7 +173,7 @@ pub async fn process_note_file(
 
     // Convert frontmatter to JSON
     let metadata_json = serde_json::to_string(note.frontmatter())
-        .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
 
     // Insert or update the note in the database
     if let Some((id, _)) = &existing {
@@ -193,7 +193,7 @@ pub async fn process_note_file(
         .bind(id)
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
     } else {
         sqlx::query(
             r#"
@@ -211,7 +211,7 @@ pub async fn process_note_file(
         .bind(note.content())
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
     }
 
     Ok(())
@@ -223,7 +223,7 @@ pub async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]
     let mut tx = pool
         .begin()
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
     for filepath in filepaths {
         // The after_note_delete trigger will handle removing tag relationships
@@ -237,13 +237,13 @@ pub async fn delete_notes_by_filepaths(pool: &Pool<Sqlite>, filepaths: &[String]
         .bind(filepath)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
     }
 
     // Commit the transaction
     tx.commit()
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
     Ok(())
 }

@@ -46,19 +46,19 @@ impl Database {
         if !Sqlite::database_exists(&db_url).await.unwrap_or(false) {
             Sqlite::create_database(&db_url)
                 .await
-                .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
+                .map_err(|e| DatabaseError::Connection(e.to_string()))?;
         }
 
         // Connect to the database
         let pool = SqlitePool::connect(&db_url)
             .await
-            .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
+            .map_err(|e| DatabaseError::Connection(e.to_string()))?;
 
         // Run migrations
         sqlx::migrate!()
             .run(&pool)
             .await
-            .map_err(|e| DatabaseError::MigrationError(e.to_string()))?;
+            .map_err(|e| DatabaseError::Migration(e.to_string()))?;
 
         Ok(Self {
             pool,
@@ -151,7 +151,7 @@ impl Database {
         let total_count = count_query_builder
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         // If limit is 0, only return the count
         if let Some(limit_val) = limit {
@@ -212,14 +212,14 @@ impl Database {
         let notes_data = main_query_builder
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         // Convert the results to a Vec of Notes, preserving the order from the database query
         let mut notes = Vec::with_capacity(notes_data.len());
         for (_db_id, metadata_json, content, _rank) in notes_data {
             // Parse the frontmatter from the metadata JSON
             let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
-                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+                .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
 
             // Create a Note from the frontmatter and content
             let note = Note::new(frontmatter, content);
@@ -239,7 +239,7 @@ impl Database {
     ///
     /// * `Ok(Some(Note))` - If exactly one note is found with the given ID prefix
     /// * `Ok(None)` - If no notes are found with the given ID prefix
-    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
+    /// * `Err(DatabaseError::MultipleMatches)` - If multiple notes are found with the given ID prefix
     pub async fn fetch_note_by_id(&self, id_prefix: &str) -> Result<Option<Note>> {
         // Count how many notes have an ID that starts with this prefix
         let count = sqlx::query_scalar::<_, i64>(
@@ -252,7 +252,7 @@ impl Database {
         .bind(id_prefix)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         // If no notes match, return None
         if count == 0 {
@@ -262,7 +262,7 @@ impl Database {
         // If multiple notes match, return an error with the count
         if count > 1 {
             return Err(
-                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
+                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
             );
         }
 
@@ -279,13 +279,13 @@ impl Database {
         .bind(id_prefix)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         // This should always be Some since we checked the count above
         if let Some((metadata_json, content)) = note_data {
             // Parse the frontmatter from the metadata JSON
             let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
-                .map_err(|e| DatabaseError::SerializationError(e.to_string()))?;
+                .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
 
             // Create a Note from the frontmatter and content
             let note = Note::new(frontmatter, content);
@@ -306,7 +306,7 @@ impl Database {
     ///
     /// * `Ok(Some(String))` - If exactly one note is found with the given ID prefix, returns its filepath
     /// * `Ok(None)` - If no notes are found with the given ID prefix
-    /// * `Err(DatabaseError::MultipleMatchesError)` - If multiple notes are found with the given ID prefix
+    /// * `Err(DatabaseError::MultipleMatches)` - If multiple notes are found with the given ID prefix
     pub async fn get_filepath_by_id_prefix(&self, id_prefix: &str) -> Result<Option<String>> {
         // Count how many notes have an ID that starts with this prefix
         let count = sqlx::query_scalar::<_, i64>(
@@ -319,7 +319,7 @@ impl Database {
         .bind(id_prefix)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         // If no notes match, return None
         if count == 0 {
@@ -329,7 +329,7 @@ impl Database {
         // If multiple notes match, return an error with the count
         if count > 1 {
             return Err(
-                DatabaseError::MultipleMatchesError(id_prefix.to_string(), count as usize).into(),
+                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
             );
         }
 
@@ -344,7 +344,7 @@ impl Database {
         .bind(id_prefix)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         Ok(filepath)
     }
@@ -381,10 +381,10 @@ impl Database {
         .bind(id_str)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         if exists == 0 {
-            return Err(DatabaseError::QueryError(format!("ID not found: {}", id_str)).into());
+            return Err(DatabaseError::Query(format!("ID not found: {}", id_str)).into());
         }
 
         // Start with the minimum prefix length and increase until we find a unique prefix
@@ -402,7 +402,7 @@ impl Database {
             .bind(prefix)
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
             // If there's only one match, we've found the shortest unique prefix
             if count == 1 {

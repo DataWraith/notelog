@@ -41,25 +41,24 @@ pub enum FrontmatterError {
 
 /// Specific error type for database operations
 #[derive(Error, Debug)]
-#[allow(clippy::enum_variant_names)]
 pub enum DatabaseError {
     #[error("Database connection error: {0}")]
-    ConnectionError(String),
+    Connection(String),
 
     #[error("Database migration error: {0}")]
-    MigrationError(String),
+    Migration(String),
 
     #[error("Database query error: {0}")]
-    QueryError(String),
+    Query(String),
 
     #[error("Database serialization error: {0}")]
-    SerializationError(String),
+    Serialization(String),
 
     #[error("File monitoring error: {0}")]
-    MonitoringError(String),
+    Monitoring(String),
 
     #[error("Multiple notes found with ID prefix '{0}': {1} matches")]
-    MultipleMatchesError(String, usize),
+    MultipleMatches(String, usize),
 }
 
 #[derive(Error, Debug)]
