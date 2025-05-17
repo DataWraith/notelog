@@ -152,7 +152,9 @@ fn create_note_from_editor(title: Option<&String>, tags: &[Tag]) -> Result<Strin
             }
 
             // Build the note and get its formatted content
+            // Disable validation for the initial template since it might be empty
             builder
+                .validate(false)
                 .build()
                 .map(|note| note.formatted_content())
                 .unwrap_or_default()
