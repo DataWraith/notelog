@@ -126,17 +126,6 @@ impl NotelogMCP {
             )]));
         }
 
-        // Convert tag strings to Tag objects
-        let mut tags = Vec::new();
-        for tag_str in &request.tags {
-            match Tag::new(tag_str) {
-                Ok(tag) => tags.push(tag),
-                Err(e) => {
-                    return Ok(CallToolResult::error(vec![Content::text(e.to_string())]));
-                }
-            }
-        }
-
         // Validate the content
         if request.content.trim().is_empty() {
             return Ok(CallToolResult::error(vec![Content::text(
@@ -144,21 +133,21 @@ impl NotelogMCP {
             )]));
         }
 
-        // Create a note using the builder
-        let builder = NoteBuilder::new()
-            .content(request.content)
-            .tags(tags)
-            .validate(true);
+        // Process tags
+        let mut builder = NoteBuilder::new().content(request.content).validate(true);
 
-        // Build the note first to get the ID
+        // Add tags one by one to catch and report any invalid tags
+        for tag_str in &request.tags {
+            match Tag::new(tag_str) {
+                Ok(tag) => builder = builder.tag(tag),
+                Err(e) => return Ok(CallToolResult::error(vec![Content::text(e.to_string())])),
+            }
+        }
+
+        // Build the note
         let note = match builder.build() {
             Ok(note) => note,
-            Err(e) => {
-                return Ok(CallToolResult::error(vec![Content::text(format!(
-                    "Error: {}",
-                    e
-                ))]));
-            }
+            Err(e) => return Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
         };
 
         // Get the ID before saving
@@ -166,18 +155,11 @@ impl NotelogMCP {
 
         // Save the note
         match note.save(&self.notes_dir, None) {
-            Ok(_relative_path) => {
-                // Return the ID in the success message
-                // The file monitoring system will automatically detect and process the new file
-                Ok(CallToolResult::success(vec![Content::text(format!(
-                    "Note added successfully. ID: {}",
-                    id
-                ))]))
-            }
-            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "Error: {}",
-                e
+            Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Note added successfully. ID: {}",
+                id
             ))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
         }
     }
 
