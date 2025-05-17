@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.6.1'></a>
+# 0.6.1 — 2025-05-17
+
+## Fixed
+
+- Note creation via the $EDITOR works again
+
 <a id='changelog-0.6.0'></a>
 # 0.6.0 — 2025-05-17
 
