@@ -217,9 +217,10 @@ impl Database {
         // Check for multiple matches and get the count
         let count = check_multiple_id_matches(&self.pool, id_prefix).await?;
 
-        // If no notes match, return None
-        if count == 0 {
-            return Ok(None);
+        if count > 1 {
+            return Err(
+                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
+            );
         }
 
         // If exactly one note matches, fetch it
@@ -238,13 +239,11 @@ impl Database {
         .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
         if let Some((metadata_json, content)) = note_data {
-            // Convert JSON metadata and content to a Note
-            let note = json_to_note(&metadata_json, &content)?;
-            Ok(Some(note))
-        } else {
-            // This should never happen, but handle it just in case
-            Ok(None)
+            return Ok(Some(json_to_note(&metadata_json, &content)?));
         }
+
+        // This should not happen, but we don't want to panic and kill the MCP server
+        Ok(None)
     }
 
     /// Get the filepath of a note by its ID prefix
@@ -261,9 +260,10 @@ impl Database {
         // Check for multiple matches and get the count
         let count = check_multiple_id_matches(&self.pool, id_prefix).await?;
 
-        // If no notes match, return None
-        if count == 0 {
-            return Ok(None);
+        if count > 1 {
+            return Err(
+                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
+            );
         }
 
         // If exactly one note matches, fetch its filepath
