@@ -84,36 +84,29 @@ async fn process_events(
 
 /// Start a file monitoring task for the notes directory
 pub async fn start_file_monitoring(pool: Pool<Sqlite>, notes_dir: &Path) -> Result<()> {
-    // Create a channel for sending file events
     let (sender, receiver) = mpsc::unbounded_channel();
 
-    // Create a new file monitoring handler with the sender
     let handler = FileMonitoringHandler::new(sender);
 
-    // Configure the watcher
     let config = Config::default()
         .with_poll_interval(Duration::from_secs(20))
-        .with_compare_contents(false); // No need to compare contents, we check mtime in process_note_file
+        .with_compare_contents(false);
 
-    // Create a watcher with the handler
     let mut watcher = RecommendedWatcher::new(handler, config)
         .map_err(|e| DatabaseError::Monitoring(e.to_string()))?;
 
-    // Watch the notes directory recursively
     watcher
         .watch(notes_dir, RecursiveMode::Recursive)
         .map_err(|e| DatabaseError::Monitoring(e.to_string()))?;
 
-    // Start a task to process events from the channel
     let notes_dir_clone = notes_dir.to_path_buf();
+
     tokio::spawn(async move {
         process_events(receiver, pool, notes_dir_clone).await;
     });
 
     // Keep the watcher alive by moving it into a tokio task
     tokio::spawn(async move {
-        // This task will keep running as long as the watcher is alive
-        // The watcher will be dropped when the task is dropped
         let _watcher = watcher;
         loop {
             tokio::time::sleep(Duration::from_secs(3600)).await;
