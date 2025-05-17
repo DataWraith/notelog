@@ -83,7 +83,7 @@ Notelog can act as a server that receives commands from AI assistants, allowing 
 }
 ```
 
-##### Configuration Tutorials
+##### How to setup an MCP server
 
 * [Claude Desktop tutorial](https://modelcontextprotocol.info/docs/quickstart/user/)
 * [Cursor IDE tutorial](https://docs.cursor.com/context/model-context-protocol)
