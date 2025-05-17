@@ -21,5 +21,3 @@ The response will be a JSON object with the following fields:
 - `content`: The full content of the note in Markdown format
 
 If the note is not found, the response will be: "Note not found."
-
-If multiple notes match the provided prefix, you'll receive an error message indicating how many matches were found, for example: "Multiple notes found with ID prefix 'a1b2': 3 matches. Please provide a longer prefix."
