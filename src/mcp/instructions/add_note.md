@@ -2,7 +2,7 @@
 
 To add a note, provide:
 
-1. Markdown content for the note, beginning with a level 1 heading (e.g., # My Note Title)
+1. Markdown content for the note, beginning with a level 1 heading (e.g., "# Note Title\n\nNote content goes here")
 2. Optional tags (up to 10) that are relevant to the content
 
 ## Title
