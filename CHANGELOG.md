@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.6.0'></a>
+# 0.6.0 — 2025-05-17
+
+## Added
+
+- The MCP server can now edit the tags of a note using the new `edit_tags` tool
+
 <a id='changelog-0.5.0'></a>
 # 0.5.0 — 2025-05-16
 
