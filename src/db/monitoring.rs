@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, mpsc};
 
-use crate::db::{is_valid_note_file, process_note_file};
+use crate::db::is_valid_note_file;
 use crate::error::{DatabaseError, Result};
 
 /// File monitoring handler that sends events to a channel
@@ -70,7 +70,7 @@ async fn process_events(
                         let _lock = processing.lock().await;
 
                         // Process the note file
-                        if let Err(e) = process_note_file(&pool, &notes_dir, &path).await {
+                        if let Err(e) = crate::db::process_note_file(&pool, &notes_dir, &path).await {
                             eprintln!("Error processing note file {}: {}", path.display(), e);
                         }
                     }

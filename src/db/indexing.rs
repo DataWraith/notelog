@@ -177,42 +177,70 @@ pub async fn process_note_file(
 
     // Insert or update the note in the database
     if let Some((id, _)) = &existing {
-        sqlx::query(
-            r#"
-            UPDATE notes
-            SET
-                mtime = ?,
-                metadata = ?,
-                content = ?
-            WHERE id = ?
-        "#,
-        )
-        .bind(&mtime_str)
-        .bind(&metadata_json)
-        .bind(note.content())
-        .bind(id)
-        .execute(pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
+        // Update existing note
+        update_note(pool, id, &mtime_str, &metadata_json, note.content()).await?;
     } else {
-        sqlx::query(
-            r#"
-            INSERT INTO notes (
-                filepath,
-                mtime,
-                metadata,
-                content
-            ) VALUES (?, ?, ?, ?)
-        "#,
-        )
-        .bind(&relative_path)
-        .bind(&mtime_str)
-        .bind(&metadata_json)
-        .bind(note.content())
-        .execute(pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
+        // Insert new note
+        insert_note(pool, &relative_path, &mtime_str, &metadata_json, note.content()).await?;
     }
+
+    Ok(())
+}
+
+/// Update an existing note in the database
+async fn update_note(
+    pool: &Pool<Sqlite>,
+    id: &i64,
+    mtime: &str,
+    metadata_json: &str,
+    content: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        UPDATE notes
+        SET
+            mtime = ?,
+            metadata = ?,
+            content = ?
+        WHERE id = ?
+    "#,
+    )
+    .bind(mtime)
+    .bind(metadata_json)
+    .bind(content)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| DatabaseError::Query(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Insert a new note into the database
+async fn insert_note(
+    pool: &Pool<Sqlite>,
+    filepath: &str,
+    mtime: &str,
+    metadata_json: &str,
+    content: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO notes (
+            filepath,
+            mtime,
+            metadata,
+            content
+        ) VALUES (?, ?, ?, ?)
+    "#,
+    )
+    .bind(filepath)
+    .bind(mtime)
+    .bind(metadata_json)
+    .bind(content)
+    .execute(pool)
+    .await
+    .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
     Ok(())
 }

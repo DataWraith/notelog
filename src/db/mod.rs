@@ -1,5 +1,6 @@
 //! Database implementation for notelog
 
+mod helpers;
 mod indexing;
 mod monitoring;
 #[cfg(test)]
@@ -12,11 +13,12 @@ pub use indexing::{delete_notes_by_filepaths, get_all_note_filepaths};
 pub use indexing::{index_notes_with_channel, is_valid_note_file, process_note_file};
 // Re-export monitoring functions
 pub use monitoring::start_file_monitoring;
-use rmcp::serde_json;
+// Re-export helper functions
+pub use helpers::{add_date_conditions, is_valid_date_range,
+                 count_notes_with_id_prefix, check_multiple_id_matches, json_to_note};
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
 
-use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
 
 use crate::error::{DatabaseError, Result};
@@ -100,15 +102,12 @@ impl Database {
         }
 
         // Check for non-overlapping date range
-        if let (Some(before_date), Some(after_date)) = (before.as_ref(), after.as_ref()) {
-            if before_date < after_date {
-                // Non-overlapping date range, return empty result
-                return Ok((Vec::new(), 0));
-            }
+        if !is_valid_date_range(before.as_ref(), after.as_ref()) {
+            return Ok((Vec::new(), 0));
         }
 
         // Build the count query with parameter placeholders
-        let mut count_query = String::from(
+        let base_count_query = String::from(
             r#"
             SELECT COUNT(*)
             FROM notes_fts fts
@@ -118,13 +117,7 @@ impl Database {
         );
 
         // Add date conditions to the count query if needed
-        if before.is_some() {
-            count_query.push_str(" AND json_extract(n.metadata, '$.created') <= ?");
-        }
-
-        if after.is_some() {
-            count_query.push_str(" AND json_extract(n.metadata, '$.created') >= ?");
-        }
+        let count_query = add_date_conditions(base_count_query, before.as_ref(), after.as_ref(), true);
 
         // Create a query builder for the count query
         let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query);
@@ -137,12 +130,12 @@ impl Database {
         count_query_builder = count_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
-        if let Some(before_date) = &before {
+        if let Some(before_date) = before.as_ref() {
             let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
             count_query_builder = count_query_builder.bind(before_str);
         }
 
-        if let Some(after_date) = &after {
+        if let Some(after_date) = after.as_ref() {
             let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
             count_query_builder = count_query_builder.bind(after_str);
         }
@@ -161,7 +154,7 @@ impl Database {
         }
 
         // Build the main query with parameter placeholders
-        let mut main_query = String::from(
+        let base_main_query = String::from(
             r#"
             SELECT
                 n.id,
@@ -175,13 +168,7 @@ impl Database {
         );
 
         // Add date conditions to the main query if needed
-        if before.is_some() {
-            main_query.push_str(" AND json_extract(n.metadata, '$.created') <= ?");
-        }
-
-        if after.is_some() {
-            main_query.push_str(" AND json_extract(n.metadata, '$.created') >= ?");
-        }
+        let mut main_query = add_date_conditions(base_main_query, before.as_ref(), after.as_ref(), true);
 
         // Add ORDER BY clause
         main_query.push_str(" ORDER BY rank, json_extract(n.metadata, '$.created') DESC");
@@ -198,12 +185,12 @@ impl Database {
         main_query_builder = main_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
-        if let Some(before_date) = &before {
+        if let Some(before_date) = before.as_ref() {
             let before_str = before_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
             main_query_builder = main_query_builder.bind(before_str);
         }
 
-        if let Some(after_date) = &after {
+        if let Some(after_date) = after.as_ref() {
             let after_str = after_date.format("%Y-%m-%dT%H:%M:%S%:z").to_string();
             main_query_builder = main_query_builder.bind(after_str);
         }
@@ -217,15 +204,10 @@ impl Database {
         // Convert the results to a Vec of Notes, preserving the order from the database query
         let mut notes = Vec::with_capacity(notes_data.len());
         for (_db_id, metadata_json, content, _rank) in notes_data {
-            // Parse the frontmatter from the metadata JSON
-            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
-                .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
-
-            // Create a Note from the frontmatter and content
-            let note = Note::new(frontmatter, content);
-
-            // Add the note to the vector
-            notes.push(note);
+            match json_to_note(&metadata_json, &content) {
+                Ok(note) => notes.push(note),
+                Err(e) => eprintln!("Error parsing note: {}", e),
+            }
         }
 
         Ok((notes, total_count as usize))
@@ -241,29 +223,12 @@ impl Database {
     /// * `Ok(None)` - If no notes are found with the given ID prefix
     /// * `Err(DatabaseError::MultipleMatches)` - If multiple notes are found with the given ID prefix
     pub async fn fetch_note_by_id(&self, id_prefix: &str) -> Result<Option<Note>> {
-        // Count how many notes have an ID that starts with this prefix
-        let count = sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM notes
-            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-            "#,
-        )
-        .bind(id_prefix)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
+        // Check for multiple matches and get the count
+        let count = check_multiple_id_matches(&self.pool, id_prefix).await?;
 
         // If no notes match, return None
         if count == 0 {
             return Ok(None);
-        }
-
-        // If multiple notes match, return an error with the count
-        if count > 1 {
-            return Err(
-                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
-            );
         }
 
         // If exactly one note matches, fetch it
@@ -283,13 +248,8 @@ impl Database {
 
         // This should always be Some since we checked the count above
         if let Some((metadata_json, content)) = note_data {
-            // Parse the frontmatter from the metadata JSON
-            let frontmatter: Frontmatter = serde_json::from_str(&metadata_json)
-                .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
-
-            // Create a Note from the frontmatter and content
-            let note = Note::new(frontmatter, content);
-
+            // Convert JSON metadata and content to a Note
+            let note = json_to_note(&metadata_json, &content)?;
             Ok(Some(note))
         } else {
             // This should never happen, but handle it just in case
@@ -308,29 +268,12 @@ impl Database {
     /// * `Ok(None)` - If no notes are found with the given ID prefix
     /// * `Err(DatabaseError::MultipleMatches)` - If multiple notes are found with the given ID prefix
     pub async fn get_filepath_by_id_prefix(&self, id_prefix: &str) -> Result<Option<String>> {
-        // Count how many notes have an ID that starts with this prefix
-        let count = sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM notes
-            WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-            "#,
-        )
-        .bind(id_prefix)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::Query(e.to_string()))?;
+        // Check for multiple matches and get the count
+        let count = check_multiple_id_matches(&self.pool, id_prefix).await?;
 
         // If no notes match, return None
         if count == 0 {
             return Ok(None);
-        }
-
-        // If multiple notes match, return an error with the count
-        if count > 1 {
-            return Err(
-                DatabaseError::MultipleMatches(id_prefix.to_string(), count as usize).into(),
-            );
         }
 
         // If exactly one note matches, fetch its filepath
@@ -392,17 +335,7 @@ impl Database {
             let prefix = &id_str[0..prefix_len];
 
             // Count how many notes have an ID that starts with this prefix
-            let count = sqlx::query_scalar::<_, i64>(
-                r#"
-                SELECT COUNT(*)
-                FROM notes
-                WHERE json_extract(metadata, '$.id') LIKE ? || '%'
-                "#,
-            )
-            .bind(prefix)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::Query(e.to_string()))?;
+            let count = count_notes_with_id_prefix(&self.pool, prefix).await?;
 
             // If there's only one match, we've found the shortest unique prefix
             if count == 1 {
