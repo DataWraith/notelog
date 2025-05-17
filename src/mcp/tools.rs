@@ -14,6 +14,7 @@ use rmcp::{
 use crate::constants::{DEFAULT_SEARCH_RESULTS, MAX_SEARCH_RESULTS};
 use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
+use crate::core::note_builder::NoteBuilder;
 use crate::core::tags::Tag;
 use crate::db::Database;
 
@@ -143,18 +144,29 @@ impl NotelogMCP {
             )]));
         }
 
-        // Create a frontmatter with the tags
-        let frontmatter = Frontmatter::with_tags(tags);
+        // Create a note using the builder
+        let builder = NoteBuilder::new()
+            .content(request.content)
+            .tags(tags)
+            .validate(true);
 
-        // Create a note with the frontmatter and content
-        let note = Note::new(frontmatter, request.content);
+        // Build the note first to get the ID
+        let note = match builder.build() {
+            Ok(note) => note,
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error: {}",
+                    e
+                ))]));
+            }
+        };
+
+        // Get the ID before saving
+        let id = note.frontmatter().id().expect("Note should have an ID");
 
         // Save the note
         match note.save(&self.notes_dir, None) {
             Ok(_relative_path) => {
-                // Get the note ID from the frontmatter
-                let id = note.frontmatter().id().expect("Note should have an ID");
-
                 // Return the ID in the success message
                 // The file monitoring system will automatically detect and process the new file
                 Ok(CallToolResult::success(vec![Content::text(format!(
@@ -181,13 +193,8 @@ impl NotelogMCP {
         // Fetch the note by ID prefix
         match db.fetch_note_by_id(&request.id).await {
             Ok(Some(note)) => {
-                // Extract tags from the note
-                let tags: Vec<String> = note
-                    .frontmatter()
-                    .tags()
-                    .iter()
-                    .map(|tag| tag.as_str().to_string())
-                    .collect();
+                // Extract tags from the note using our helper method
+                let tags: Vec<String> = note.tags_as_strings();
 
                 // Create a response object with tags and content
                 let response = serde_json::json!({
@@ -250,10 +257,7 @@ impl NotelogMCP {
         let remove_set: HashSet<String> = request.remove.iter().cloned().collect();
 
         // Find tags that appear in both add and remove
-        let duplicates: Vec<String> = add_set
-            .intersection(&remove_set)
-            .cloned()
-            .collect();
+        let duplicates: Vec<String> = add_set.intersection(&remove_set).cloned().collect();
 
         if !duplicates.is_empty() {
             return Ok(CallToolResult::error(vec![Content::text(format!(
@@ -269,7 +273,8 @@ impl NotelogMCP {
                 Ok(tag) => tags_to_add.push(tag),
                 Err(e) => {
                     return Ok(CallToolResult::error(vec![Content::text(format!(
-                        "Invalid tag to add: {}", e
+                        "Invalid tag to add: {}",
+                        e
                     ))]));
                 }
             }
@@ -282,7 +287,8 @@ impl NotelogMCP {
                 Ok(tag) => tags_to_remove.push(tag),
                 Err(e) => {
                     return Ok(CallToolResult::error(vec![Content::text(format!(
-                        "Invalid tag to remove: {}", e
+                        "Invalid tag to remove: {}",
+                        e
                     ))]));
                 }
             }
@@ -347,7 +353,7 @@ impl NotelogMCP {
             // Create a new frontmatter with the same created timestamp and tags, but with a new ID
             let new_frontmatter = Frontmatter::new(
                 *note.frontmatter().created(),
-                note.frontmatter().tags().to_vec()
+                note.frontmatter().tags().to_vec(),
             );
 
             // Replace the frontmatter in the note
@@ -355,32 +361,23 @@ impl NotelogMCP {
             note = Note::new(new_frontmatter, content);
         }
 
-        // Create a new note with an empty set of tags but preserving the ID and timestamp
-        let mut new_note = Note::new(
-            Frontmatter::new(*note.frontmatter().created(), Vec::new()),
-            note.content().to_string()
-        );
+        // Create a mutable copy of the note
+        let mut new_note = note.clone();
 
-        // If the original note had an ID, we need to preserve it
-        if let Some(id) = note.frontmatter().id() {
-            // Create a new frontmatter with the same ID and timestamp but no tags
-            new_note = Note::new(
-                Frontmatter::with_id(*note.frontmatter().created(), Vec::new(), id.clone()),
-                note.content().to_string()
+        // If the note doesn't have an ID, generate one by creating a new frontmatter
+        if new_note.frontmatter().id().is_none() {
+            // Create a new frontmatter with the same created timestamp and tags, but with a new ID
+            let new_frontmatter = Frontmatter::new(
+                *new_note.frontmatter().created(),
+                new_note.frontmatter().tags().to_vec(),
             );
+
+            // Replace the frontmatter in the note
+            new_note = Note::new(new_frontmatter, new_note.content().to_string());
         }
 
-        // Add all existing tags that are not in the remove list
-        for tag in note.frontmatter().tags() {
-            if !tags_to_remove.contains(tag) {
-                new_note.frontmatter_mut().add_tag(tag.clone());
-            }
-        }
-
-        // Add all new tags
-        for tag in tags_to_add {
-            new_note.frontmatter_mut().add_tag(tag);
-        }
+        // Update the tags using our new method
+        new_note.update_tags(tags_to_add, tags_to_remove);
 
         // Use the new note for saving
         note = new_note;
@@ -388,30 +385,25 @@ impl NotelogMCP {
         // Save the updated note
         match fs::write(&absolute_path, note.formatted_content()) {
             Ok(_) => {
-                // Extract tags from the updated note
-                let tags: Vec<String> = note
-                    .frontmatter()
-                    .tags()
-                    .iter()
-                    .map(|tag| tag.as_str().to_string())
-                    .collect();
+                // Extract tags from the updated note using our helper method
+                let tags: Vec<String> = note.tags_as_strings();
 
                 // Create a success message with the updated tags
                 let message = if tags.is_empty() {
                     "Tags updated successfully. The note now has no tags.".to_string()
                 } else {
-                    format!("Tags updated successfully. The note now has the following tags: {}",
-                            tags.join(", "))
+                    format!(
+                        "Tags updated successfully. The note now has the following tags: {}",
+                        tags.join(", ")
+                    )
                 };
 
                 Ok(CallToolResult::success(vec![Content::text(message)]))
             }
-            Err(e) => {
-                Ok(CallToolResult::error(vec![Content::text(format!(
-                    "Error writing note file: {}",
-                    e
-                ))]))
-            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "Error writing note file: {}",
+                e
+            ))])),
         }
     }
 
@@ -513,13 +505,8 @@ impl NotelogMCP {
                             "_no_id".to_string()
                         };
 
-                        // Extract tags from the note
-                        let tags: Vec<String> = note
-                            .frontmatter()
-                            .tags()
-                            .iter()
-                            .map(|tag| tag.as_str().to_string())
-                            .collect();
+                        // Extract tags from the note using our helper method
+                        let tags: Vec<String> = note.tags_as_strings();
 
                         // Create a note data object
                         let note_data = serde_json::json!({

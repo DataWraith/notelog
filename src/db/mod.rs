@@ -14,8 +14,10 @@ pub use indexing::{index_notes_with_channel, is_valid_note_file, process_note_fi
 // Re-export monitoring functions
 pub use monitoring::start_file_monitoring;
 // Re-export helper functions
-pub use helpers::{add_date_conditions, is_valid_date_range,
-                 count_notes_with_id_prefix, check_multiple_id_matches, json_to_note};
+pub use helpers::{
+    add_date_conditions, check_multiple_id_matches, count_notes_with_id_prefix,
+    is_valid_date_range, json_to_note,
+};
 use sqlx::{Pool, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::{Path, PathBuf};
 
@@ -117,7 +119,8 @@ impl Database {
         );
 
         // Add date conditions to the count query if needed
-        let count_query = add_date_conditions(base_count_query, before.as_ref(), after.as_ref(), true);
+        let count_query =
+            add_date_conditions(base_count_query, before.as_ref(), after.as_ref(), true);
 
         // Create a query builder for the count query
         let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query);
@@ -168,7 +171,8 @@ impl Database {
         );
 
         // Add date conditions to the main query if needed
-        let mut main_query = add_date_conditions(base_main_query, before.as_ref(), after.as_ref(), true);
+        let mut main_query =
+            add_date_conditions(base_main_query, before.as_ref(), after.as_ref(), true);
 
         // Add ORDER BY clause
         main_query.push_str(" ORDER BY rank, json_extract(n.metadata, '$.created') DESC");
@@ -524,7 +528,10 @@ mod query_tests {
     #[test]
     fn test_process_search_query_with_quadruple_backslash() {
         // Test query with quadruple backslashes
-        assert_eq!(process_search_query("search\\\\\\\\term"), "search\\\\\\\\term");
+        assert_eq!(
+            process_search_query("search\\\\\\\\term"),
+            "search\\\\\\\\term"
+        );
     }
 
     #[test]
@@ -560,19 +567,13 @@ mod query_tests {
     #[test]
     fn test_process_search_query_with_backslash_escaping_space() {
         // Test query with backslash escaping a space
-        assert_eq!(
-            process_search_query("search\\ term"),
-            "search\\ term"
-        );
+        assert_eq!(process_search_query("search\\ term"), "search\\ term");
     }
 
     #[test]
     fn test_process_search_query_with_backslash_escaping_plus() {
         // Test query with backslash escaping a plus sign
-        assert_eq!(
-            process_search_query("search\\+term"),
-            "search\\+term"
-        );
+        assert_eq!(process_search_query("search\\+term"), "search\\+term");
     }
 
     #[test]

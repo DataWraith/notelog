@@ -181,7 +181,14 @@ pub async fn process_note_file(
         update_note(pool, id, &mtime_str, &metadata_json, note.content()).await?;
     } else {
         // Insert new note
-        insert_note(pool, &relative_path, &mtime_str, &metadata_json, note.content()).await?;
+        insert_note(
+            pool,
+            &relative_path,
+            &mtime_str,
+            &metadata_json,
+            note.content(),
+        )
+        .await?;
     }
 
     Ok(())

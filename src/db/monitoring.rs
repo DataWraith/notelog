@@ -70,7 +70,8 @@ async fn process_events(
                         let _lock = processing.lock().await;
 
                         // Process the note file
-                        if let Err(e) = crate::db::process_note_file(&pool, &notes_dir, &path).await {
+                        if let Err(e) = crate::db::process_note_file(&pool, &notes_dir, &path).await
+                        {
                             eprintln!("Error processing note file {}: {}", path.display(), e);
                         }
                     }

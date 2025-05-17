@@ -32,23 +32,12 @@ impl Frontmatter {
         }
     }
 
-    /// Create a new frontmatter with the given creation timestamp, tags, and ID
-    pub fn with_id(created: DateTime<Local>, tags: Vec<Tag>, id: Id) -> Self {
-        Self {
-            created,
-            tags,
-            id: Some(id),
-        }
-    }
-
     /// Create a new frontmatter with the current timestamp and given tags
-    /// A random Id will be generated automatically
     pub fn with_tags(tags: Vec<Tag>) -> Self {
         Self::new(Local::now(), tags)
     }
 
     /// Create a new frontmatter with the current timestamp and no tags
-    /// A random Id will be generated automatically
     pub fn default() -> Self {
         Self::with_tags(vec![])
     }
@@ -75,6 +64,51 @@ impl Frontmatter {
         }
 
         self.tags.push(tag);
+    }
+
+    /// Add multiple tags to the frontmatter
+    pub fn add_tags<I>(&mut self, tags: I)
+    where
+        I: IntoIterator<Item = Tag>,
+    {
+        for tag in tags {
+            self.add_tag(tag);
+        }
+    }
+
+    /// Remove a tag from the frontmatter
+    pub fn remove_tag(&mut self, tag: &Tag) -> bool {
+        let initial_len = self.tags.len();
+        self.tags.retain(|t| t != tag);
+        self.tags.len() < initial_len
+    }
+
+    /// Update tags by adding and removing specified tags
+    pub fn update_tags<I, J>(&mut self, tags_to_add: I, tags_to_remove: J)
+    where
+        I: IntoIterator<Item = Tag>,
+        J: IntoIterator<Item = Tag>,
+    {
+        // First remove tags
+        for tag in tags_to_remove {
+            self.remove_tag(&tag);
+        }
+
+        // Then add new tags
+        for tag in tags_to_add {
+            self.add_tag(tag);
+        }
+    }
+
+    /// Create a new frontmatter with the same ID and timestamp but different tags
+    pub fn with_updated_tags<I, J>(&self, tags_to_add: I, tags_to_remove: J) -> Self
+    where
+        I: IntoIterator<Item = Tag>,
+        J: IntoIterator<Item = Tag>,
+    {
+        let mut new_frontmatter = self.clone();
+        new_frontmatter.update_tags(tags_to_add, tags_to_remove);
+        new_frontmatter
     }
 
     /// Apply frontmatter to content
@@ -475,5 +509,93 @@ mod tests {
         // Invalid id
         let yaml = "id: invalid-id\ncreated: 2025-04-01T12:00:00+00:00";
         assert!(yaml.parse::<Frontmatter>().is_err());
+    }
+
+    #[test]
+    fn test_frontmatter_add_tags_method() {
+        let mut frontmatter = Frontmatter::default();
+        assert!(frontmatter.tags().is_empty());
+
+        // Add multiple tags
+        let tag1 = Tag::new("test").unwrap();
+        let tag2 = Tag::new("example").unwrap();
+        frontmatter.add_tags(vec![tag1.clone(), tag2.clone()]);
+
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert_eq!(frontmatter.tags()[0].as_str(), "test");
+        assert_eq!(frontmatter.tags()[1].as_str(), "example");
+
+        // Add a duplicate tag (should be ignored)
+        frontmatter.add_tags(vec![tag1.clone()]);
+        assert_eq!(frontmatter.tags().len(), 2);
+    }
+
+    #[test]
+    fn test_frontmatter_remove_tag_method() {
+        let tag1 = Tag::new("test").unwrap();
+        let tag2 = Tag::new("example").unwrap();
+        let mut frontmatter = Frontmatter::with_tags(vec![tag1.clone(), tag2.clone()]);
+
+        // Remove a tag
+        let removed = frontmatter.remove_tag(&tag1);
+        assert!(removed);
+        assert_eq!(frontmatter.tags().len(), 1);
+        assert_eq!(frontmatter.tags()[0].as_str(), "example");
+
+        // Try to remove a non-existent tag
+        let tag3 = Tag::new("nonexistent").unwrap();
+        let removed = frontmatter.remove_tag(&tag3);
+        assert!(!removed);
+        assert_eq!(frontmatter.tags().len(), 1);
+    }
+
+    #[test]
+    fn test_frontmatter_update_tags_method() {
+        let tag1 = Tag::new("test").unwrap();
+        let tag2 = Tag::new("example").unwrap();
+        let mut frontmatter = Frontmatter::with_tags(vec![tag1.clone(), tag2.clone()]);
+
+        // Add and remove tags
+        let tag3 = Tag::new("new").unwrap();
+        frontmatter.update_tags(vec![tag3.clone()], vec![tag1.clone()]);
+
+        // Should have tag2 and tag3, but not tag1
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert!(!frontmatter.tags().iter().any(|t| t.as_str() == "test"));
+        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "example"));
+        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "new"));
+    }
+
+    #[test]
+    fn test_frontmatter_with_updated_tags_method() {
+        let tag1 = Tag::new("test").unwrap();
+        let tag2 = Tag::new("example").unwrap();
+        let frontmatter = Frontmatter::with_tags(vec![tag1.clone(), tag2.clone()]);
+
+        // Create a new frontmatter with updated tags
+        let tag3 = Tag::new("new").unwrap();
+        let new_frontmatter = frontmatter.with_updated_tags(vec![tag3.clone()], vec![tag1.clone()]);
+
+        // Original frontmatter should be unchanged
+        assert_eq!(frontmatter.tags().len(), 2);
+        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "test"));
+        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "example"));
+
+        // New frontmatter should have updated tags
+        assert_eq!(new_frontmatter.tags().len(), 2);
+        assert!(!new_frontmatter.tags().iter().any(|t| t.as_str() == "test"));
+        assert!(
+            new_frontmatter
+                .tags()
+                .iter()
+                .any(|t| t.as_str() == "example")
+        );
+        assert!(new_frontmatter.tags().iter().any(|t| t.as_str() == "new"));
+
+        // IDs should be the same
+        assert_eq!(frontmatter.id(), new_frontmatter.id());
+
+        // Created timestamps should be the same
+        assert_eq!(frontmatter.created(), new_frontmatter.created());
     }
 }

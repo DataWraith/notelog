@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::cli::AddArgs;
-use crate::core::frontmatter::Frontmatter;
 use crate::core::note::Note;
+use crate::core::note_builder::NoteBuilder;
 use crate::core::tags::{Tag, extract_tags_from_args};
 use crate::error::{NotelogError, Result};
 use crate::utils::{open_editor, read_file_content, validate_content, wait_for_user_input};
@@ -36,24 +36,27 @@ fn add_title_to_content(
     title: Option<&String>,
     tags: &[Tag],
 ) -> Result<(Note, Option<String>)> {
+    let mut builder = NoteBuilder::new().tags(tags.to_vec());
+
     if let Some(title) = title {
         // Check if the content already has a markdown header
         if !content.trim_start().starts_with('#') {
-            return Ok((
-                Note::new(
-                    Frontmatter::with_tags(tags.to_vec()),
-                    format!("# {}\n\n{}", title, content),
-                ),
-                Some(title.clone()),
-            ));
+            // Add title as header to content
+            builder = builder.content(format!("# {}\n\n{}", title, content));
+        } else {
+            // Content already has a header
+            builder = builder.content(content);
         }
+
+        // Set title override
+        builder = builder.title_override(title.clone());
+    } else {
+        // No title provided
+        builder = builder.content(content);
     }
 
-    // No title provided or content already has a header
-    Ok((
-        Note::new(Frontmatter::with_tags(tags.to_vec()), content),
-        title.cloned(),
-    ))
+    // Build the note
+    Ok((builder.build()?, title.cloned()))
 }
 
 /// Create a Note object from various input sources
@@ -99,26 +102,24 @@ pub fn create_note_from_input(
         create_note_from_editor(args.title.as_ref(), &tags)?
     };
 
-    validate_content(content.as_bytes())?;
-
     // Get the title override if provided
     let title_override = args.title.clone();
 
-    // Create the note object
-    let note = match Note::from_str(&content) {
-        Ok(note) => {
-            if note.frontmatter().tags().is_empty() && !tags.is_empty() {
-                // Note has no tags but we have tags from command line
-                let frontmatter = Frontmatter::with_tags(tags);
-                Note::new(frontmatter, note.content().to_string())
-            } else {
-                // Note already has valid frontmatter or no tags specified
-                note
-            }
-        }
-        _ => {
-            // For invalid frontmatter, use our helper function to handle title
-            return add_title_to_content(content, args.title.as_ref(), &tags);
+    // Create a builder with the content and tags
+    let content_clone = content.clone();
+    let tags_clone = tags.clone();
+
+    let builder = NoteBuilder::new()
+        .content(content)
+        .tags(tags)
+        .validate(true);
+
+    // Try to parse the content as a note, or create a new one if parsing fails
+    let note = match builder.parse_or_create() {
+        Ok(note) => note,
+        Err(_) => {
+            // If there was an error, try the helper function as a fallback
+            return add_title_to_content(content_clone, args.title.as_ref(), &tags_clone);
         }
     };
 
@@ -140,17 +141,21 @@ fn create_note_from_editor(title: Option<&String>, tags: &[Tag]) -> Result<Strin
         } else {
             let base_content = title.map(|t| format!("# {}", t)).unwrap_or_default();
 
-            // Create frontmatter with the provided tags
-            let mut frontmatter = Frontmatter::with_tags(tags.to_vec());
+            // Create a builder with the provided tags
+            let mut builder = NoteBuilder::new().content(base_content).tags(tags.to_vec());
 
             // Only add the 'edit-me' tag if no tags were provided
             if tags.is_empty() {
                 if let Ok(tag) = Tag::new("edit-me") {
-                    frontmatter.add_tag(tag);
+                    builder = builder.tag(tag);
                 }
             }
 
-            frontmatter.apply_to_content(&base_content)
+            // Build the note and get its formatted content
+            builder
+                .build()
+                .map(|note| note.formatted_content())
+                .unwrap_or_default()
         };
 
         content = open_editor(Some(&editor_content))?;
@@ -514,11 +519,11 @@ tags:
         // Check that the content is preserved
         assert_eq!(note.content(), "# Note with existing frontmatter");
 
-        // Check that the existing frontmatter tags are preserved (not replaced by command line tags)
-        // since the note already has tags
+        // Check that both the existing frontmatter tags and command line tags are present
         let tags = note.frontmatter().tags();
-        assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].as_str(), "existing");
+        assert_eq!(tags.len(), 2);
+        assert!(tags.iter().any(|t| t.as_str() == "existing"));
+        assert!(tags.iter().any(|t| t.as_str() == "cli-tag"));
     }
 
     #[test]

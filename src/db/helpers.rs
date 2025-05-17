@@ -147,4 +147,3 @@ pub fn json_to_note(metadata_json: &str, content: &str) -> Result<Note> {
     // Create a Note from the frontmatter and content
     Ok(Note::new(frontmatter, content.to_string()))
 }
-

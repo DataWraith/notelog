@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::core::frontmatter::Frontmatter;
+use crate::core::tags::Tag;
 use crate::error::{NotelogError, Result};
 use crate::utils::{create_date_directories, generate_filename, validate_content};
 
@@ -44,6 +45,8 @@ impl Note {
     }
 
     /// Get the formatted content with frontmatter
+    ///
+    /// This returns the complete note content with frontmatter and content properly formatted
     pub fn formatted_content(&self) -> String {
         format!("{}\n\n{}\n\n", self.frontmatter, self.content.trim_end())
     }
@@ -93,6 +96,25 @@ impl Note {
 
         // Return the relative path
         Ok(relative_path)
+    }
+
+    /// Extract tags as strings from the note
+    pub fn tags_as_strings(&self) -> Vec<String> {
+        self.frontmatter
+            .tags()
+            .iter()
+            .map(|tag| tag.as_str().to_string())
+            .collect()
+    }
+
+    /// Update the note's tags by adding and removing specified tags
+    pub fn update_tags<I, J>(&mut self, tags_to_add: I, tags_to_remove: J)
+    where
+        I: IntoIterator<Item = Tag>,
+        J: IntoIterator<Item = Tag>,
+    {
+        self.frontmatter_mut()
+            .update_tags(tags_to_add, tags_to_remove);
     }
 
     /// Extract title from the note content
@@ -331,5 +353,44 @@ mod tests {
         let absolute_path = notes_dir.join(&relative_path);
         let saved_content = fs::read_to_string(absolute_path).unwrap();
         assert!(saved_content.contains("# Original Title"));
+    }
+
+    #[test]
+    fn test_tags_as_strings() {
+        // Create a note with tags
+        let tag1 = Tag::new("+test").unwrap();
+        let tag2 = Tag::new("+example").unwrap();
+        let frontmatter = Frontmatter::with_tags(vec![tag1, tag2]);
+        let content = "# Test Note\nThis is a test note.";
+        let note = Note::new(frontmatter, content.to_string());
+
+        // Get tags as strings
+        let tags = note.tags_as_strings();
+
+        // Verify the tags
+        assert_eq!(tags.len(), 2);
+        assert!(tags.contains(&"test".to_string()));
+        assert!(tags.contains(&"example".to_string()));
+    }
+
+    #[test]
+    fn test_update_tags() {
+        // Create a note with tags
+        let tag1 = Tag::new("+test").unwrap();
+        let tag2 = Tag::new("+example").unwrap();
+        let frontmatter = Frontmatter::with_tags(vec![tag1.clone(), tag2.clone()]);
+        let content = "# Test Note\nThis is a test note.";
+        let mut note = Note::new(frontmatter, content.to_string());
+
+        // Add and remove tags
+        let tag3 = Tag::new("+new").unwrap();
+        note.update_tags(vec![tag3.clone()], vec![tag1.clone()]);
+
+        // Verify the tags
+        let tags = note.tags_as_strings();
+        assert_eq!(tags.len(), 2);
+        assert!(!tags.contains(&"test".to_string()));
+        assert!(tags.contains(&"example".to_string()));
+        assert!(tags.contains(&"new".to_string()));
     }
 }
