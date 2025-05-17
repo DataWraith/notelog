@@ -12,7 +12,7 @@ use rmcp::{
 };
 
 use crate::constants::{DEFAULT_SEARCH_RESULTS, MAX_SEARCH_RESULTS};
-use crate::core::frontmatter::Frontmatter;
+use crate::core::id::Id;
 use crate::core::note::Note;
 use crate::core::note_builder::NoteBuilder;
 use crate::core::tags::Tag;
@@ -147,7 +147,12 @@ impl NotelogMCP {
         // Build the note
         let note = match builder.build() {
             Ok(note) => note,
-            Err(e) => return Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Error: {}",
+                    e
+                ))]));
+            }
         };
 
         // Get the ID before saving
@@ -159,7 +164,10 @@ impl NotelogMCP {
                 "Note added successfully. ID: {}",
                 id
             ))])),
-            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!("Error: {}", e))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "Error: {}",
+                e
+            ))])),
         }
     }
 
@@ -169,7 +177,6 @@ impl NotelogMCP {
         &self,
         #[tool(aggr)] request: FetchNoteRequest,
     ) -> Result<CallToolResult, McpError> {
-        // Database is now always available
         let db = &self.db;
 
         // Fetch the note by ID prefix
@@ -224,7 +231,6 @@ impl NotelogMCP {
         &self,
         #[tool(aggr)] request: EditTagsRequest,
     ) -> Result<CallToolResult, McpError> {
-        // Database is now always available
         let db = &self.db;
 
         // Validate that at least one of add or remove has tags
@@ -330,39 +336,13 @@ impl NotelogMCP {
             }
         };
 
-        // If the note doesn't have an ID, generate one by creating a new frontmatter
+        // If the note doesn't have an ID, generate one
         if note.frontmatter().id().is_none() {
-            // Create a new frontmatter with the same created timestamp and tags, but with a new ID
-            let new_frontmatter = Frontmatter::new(
-                *note.frontmatter().created(),
-                note.frontmatter().tags().to_vec(),
-            );
-
-            // Replace the frontmatter in the note
-            let content = note.content().to_string();
-            note = Note::new(new_frontmatter, content);
+            note.frontmatter_mut().set_id(Id::default());
         }
 
-        // Create a mutable copy of the note
-        let mut new_note = note.clone();
-
-        // If the note doesn't have an ID, generate one by creating a new frontmatter
-        if new_note.frontmatter().id().is_none() {
-            // Create a new frontmatter with the same created timestamp and tags, but with a new ID
-            let new_frontmatter = Frontmatter::new(
-                *new_note.frontmatter().created(),
-                new_note.frontmatter().tags().to_vec(),
-            );
-
-            // Replace the frontmatter in the note
-            new_note = Note::new(new_frontmatter, new_note.content().to_string());
-        }
-
-        // Update the tags using our new method
-        new_note.update_tags(tags_to_add, tags_to_remove);
-
-        // Use the new note for saving
-        note = new_note;
+        // Update the tags
+        note.update_tags(tags_to_add, tags_to_remove);
 
         // Save the updated note
         match fs::write(&absolute_path, note.formatted_content()) {
@@ -395,7 +375,6 @@ impl NotelogMCP {
         &self,
         #[tool(aggr)] request: SearchNotesRequest,
     ) -> Result<CallToolResult, McpError> {
-        // Database is now always available
         let db = &self.db;
 
         // Validate that a query is provided

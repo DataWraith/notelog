@@ -57,6 +57,11 @@ impl Frontmatter {
         self.id.as_ref()
     }
 
+    /// Set the id
+    pub fn set_id(&mut self, id: Id) {
+        self.id = Some(id);
+    }
+
     /// Add a tag to the frontmatter
     pub fn add_tag(&mut self, tag: Tag) {
         if self.tags.contains(&tag) {
