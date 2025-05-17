@@ -17,22 +17,18 @@ pub struct Id(String);
 impl Id {
     /// Create a new Id from a string, validating it in the process
     pub fn new(input: &str) -> Result<Self> {
-        // Trim the input and convert to lowercase
         let processed_input = input.trim().to_lowercase();
 
-        // Check if the processed input is empty
         if processed_input.is_empty() {
             return Err(NotelogError::IdError(IdError::Empty));
         }
 
-        // Check if the processed input has the correct length
         if processed_input.len() != 16 {
             return Err(NotelogError::IdError(IdError::InvalidLength(
                 processed_input.len(),
             )));
         }
 
-        // Check if the processed input contains only valid base36 characters (0-9, a-z)
         if !processed_input
             .chars()
             .all(|c| c.is_ascii_digit() || (c.is_ascii_lowercase() && c.is_ascii_alphabetic()))

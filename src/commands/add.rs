@@ -12,17 +12,12 @@ use crate::utils::{open_editor, read_file_content, validate_content, wait_for_us
 ///
 /// Returns the path to the created note file on success (relative to notes_dir)
 pub fn add_note(notes_dir: &Path, args: AddArgs, stdin_content: Vec<u8>) -> Result<PathBuf> {
-    // Create a note from the input
     let (note, title_override) = create_note_from_input(args, stdin_content)?;
 
-    // Save the note to disk
     let relative_path = note.save(notes_dir, title_override.as_deref())?;
-
-    // Print success message with absolute path for user convenience
     let absolute_path = notes_dir.join(&relative_path);
     println!("Note saved to: {}", absolute_path.display());
 
-    // Return the relative path
     Ok(relative_path)
 }
 
@@ -163,7 +158,7 @@ fn create_note_from_editor(title: Option<&String>, tags: &[Tag]) -> Result<Strin
         content = open_editor(Some(&editor_content))?;
         content = content.trim().to_string();
 
-        // Check if the content is completely blank
+        // Check if the content is completely blank or just the default title
         if content.is_empty() {
             println!("Note is empty. Exiting without saving.");
             return Err(NotelogError::EmptyContent);

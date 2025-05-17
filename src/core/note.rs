@@ -55,7 +55,6 @@ impl Note {
     ///
     /// Returns the path to the saved note file, relative to the notes_dir
     pub fn save(&self, notes_dir: &Path, title_override: Option<&str>) -> Result<PathBuf> {
-        // Get the current date and time
         let now = Local::now();
 
         // Create the year and month directories
@@ -68,6 +67,7 @@ impl Note {
         };
 
         if title.is_empty() {
+            // If the title is empty, there can be no content either.
             return Err(NotelogError::EmptyContent);
         }
 
@@ -174,7 +174,6 @@ impl FromStr for Note {
         // First validate the content
         validate_content(s.as_bytes())?;
 
-        // Use Frontmatter::extract_from_content to parse the frontmatter
         match Frontmatter::extract_from_content(s) {
             Ok((Some(frontmatter), content)) => {
                 // Valid frontmatter found

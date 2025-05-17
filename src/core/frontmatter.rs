@@ -32,14 +32,14 @@ impl Frontmatter {
         }
     }
 
-    /// Create a new frontmatter with the current timestamp and given tags
-    pub fn with_tags(tags: Vec<Tag>) -> Self {
-        Self::new(Local::now(), tags)
-    }
-
     /// Create a new frontmatter with the current timestamp and no tags
     pub fn default() -> Self {
         Self::with_tags(vec![])
+    }
+
+    /// Create a new frontmatter with the current timestamp and given tags
+    pub fn with_tags(tags: Vec<Tag>) -> Self {
+        Self::new(Local::now(), tags)
     }
 
     /// Get the creation timestamp
@@ -78,18 +78,16 @@ impl Frontmatter {
         self.tags.len() < initial_len
     }
 
-    /// Update tags by adding and removing specified tags
+    /// Update tags by adding and removing the specified tags
     pub fn update_tags<I, J>(&mut self, tags_to_add: I, tags_to_remove: J)
     where
         I: IntoIterator<Item = Tag>,
         J: IntoIterator<Item = Tag>,
     {
-        // First remove tags
         for tag in tags_to_remove {
             self.remove_tag(&tag);
         }
 
-        // Then add new tags
         for tag in tags_to_add {
             self.add_tag(tag);
         }
@@ -97,15 +95,11 @@ impl Frontmatter {
 
     /// Extract frontmatter from content if present
     pub fn extract_from_content(content: &str) -> Result<(Option<Self>, String)> {
-        // Extract YAML and content
         match Self::extract_yaml_and_content(content) {
-            Ok((Some(yaml), content_without_frontmatter)) => {
-                // Parse the YAML
-                match Self::from_str(&yaml) {
-                    Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
-                    Err(e) => Err(e),
-                }
-            }
+            Ok((Some(yaml), content_without_frontmatter)) => match Self::from_str(&yaml) {
+                Ok(frontmatter) => Ok((Some(frontmatter), content_without_frontmatter)),
+                Err(e) => Err(e),
+            },
             Ok((None, content_without_frontmatter)) => {
                 // No frontmatter or empty frontmatter
                 Ok((None, content_without_frontmatter))
@@ -116,17 +110,14 @@ impl Frontmatter {
 
     /// Format the frontmatter as a YAML string
     pub fn to_yaml(&self) -> String {
-        // Add id
         let id_yaml = if let Some(id) = &self.id {
             format!("id: {}\n", id)
         } else {
             String::new()
         };
 
-        // Format with one-second precision (no fractional seconds)
         let created_yaml = self.created.format("created: %Y-%m-%dT%H:%M:%S%:z\n");
 
-        // Format tags for YAML, omitting the tags array if it's empty
         let tags_yaml = if !self.tags.is_empty() {
             let mut yaml = String::from("\ntags:");
             for tag in &self.tags {
@@ -194,28 +185,11 @@ impl FromStr for Frontmatter {
     type Err = NotelogError;
 
     fn from_str(yaml: &str) -> Result<Self> {
-        // Parse the YAML
         let frontmatter_data: FrontmatterData = match serde_yaml::from_str(yaml) {
             Ok(data) => data,
             Err(e) => return Err(FrontmatterError::InvalidYaml(e.to_string()).into()),
         };
 
-        // Validate and convert the created timestamp
-        let created = match chrono::DateTime::parse_from_rfc3339(&frontmatter_data.created) {
-            Ok(dt) => dt.with_timezone(&Local),
-            Err(e) => return Err(FrontmatterError::InvalidTimestamp(e.to_string()).into()),
-        };
-
-        // Convert string tags to Tag objects
-        let mut tags = Vec::new();
-        for tag_str in &frontmatter_data.tags {
-            match Tag::new(tag_str) {
-                Ok(tag) => tags.push(tag),
-                Err(e) => return Err(e),
-            }
-        }
-
-        // Parse the id if present
         let id = if let Some(id_str) = frontmatter_data.id {
             match Id::from_str(&id_str) {
                 Ok(id) => Some(id),
@@ -224,6 +198,19 @@ impl FromStr for Frontmatter {
         } else {
             None
         };
+
+        let created = match chrono::DateTime::parse_from_rfc3339(&frontmatter_data.created) {
+            Ok(dt) => dt.with_timezone(&Local),
+            Err(e) => return Err(FrontmatterError::InvalidTimestamp(e.to_string()).into()),
+        };
+
+        let mut tags = Vec::new();
+        for tag_str in &frontmatter_data.tags {
+            match Tag::new(tag_str) {
+                Ok(tag) => tags.push(tag),
+                Err(e) => return Err(e),
+            }
+        }
 
         Ok(Self { created, tags, id })
     }

@@ -14,12 +14,10 @@ impl Tag {
         // Remove the '+' prefix if present
         let tag = input.strip_prefix('+').unwrap_or(input).to_lowercase();
 
-        // Check if tag is empty
         if tag.is_empty() {
             return Err(NotelogError::TagError(TagError::Empty));
         }
 
-        // Check if tag starts or ends with a dash
         if tag.starts_with('-') || tag.ends_with('-') {
             return Err(NotelogError::TagError(TagError::InvalidDashPosition(tag)));
         }
@@ -35,7 +33,6 @@ impl Tag {
         Ok(Tag(tag))
     }
 
-    /// Get the tag as a string
     pub fn as_str(&self) -> &str {
         &self.0
     }

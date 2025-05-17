@@ -39,15 +39,21 @@ impl NoteBuilder {
         }
     }
 
-    /// Set the content of the note
-    pub fn content<S: Into<String>>(mut self, content: S) -> Self {
-        self.content = content.into();
+    /// Set the creation timestamp
+    pub fn created(mut self, created: DateTime<Local>) -> Self {
+        self.created = Some(created);
         self
     }
 
     /// Set the frontmatter directly
     pub fn frontmatter(mut self, frontmatter: Frontmatter) -> Self {
         self.frontmatter = Some(frontmatter);
+        self
+    }
+
+    /// Set the content of the note
+    pub fn content<S: Into<String>>(mut self, content: S) -> Self {
+        self.content = content.into();
         self
     }
 
@@ -63,12 +69,6 @@ impl NoteBuilder {
         I: IntoIterator<Item = Tag>,
     {
         self.tags.extend(tags);
-        self
-    }
-
-    /// Set the creation timestamp
-    pub fn created(mut self, created: DateTime<Local>) -> Self {
-        self.created = Some(created);
         self
     }
 
@@ -118,7 +118,6 @@ impl NoteBuilder {
 
     /// Try to parse content as a note, falling back to creating a new note if parsing fails
     pub fn parse_or_create(self) -> Result<Note> {
-        // Try to parse the content as a note
         match Note::from_str(&self.content) {
             Ok(mut note) => {
                 // If we have tags, add them to the note
@@ -129,6 +128,7 @@ impl NoteBuilder {
             }
             Err(_) => {
                 // If parsing fails, create a new note with the content
+                // TODO: Is this really the best way to handle this?
                 self.build()
             }
         }
