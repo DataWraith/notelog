@@ -144,6 +144,5 @@ pub fn json_to_note(metadata_json: &str, content: &str) -> Result<Note> {
     let frontmatter: Frontmatter = serde_json::from_str(metadata_json)
         .map_err(|e| DatabaseError::Serialization(e.to_string()))?;
 
-    // Create a Note from the frontmatter and content
     Ok(Note::new(frontmatter, content.to_string()))
 }

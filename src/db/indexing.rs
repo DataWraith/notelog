@@ -19,16 +19,13 @@ use crate::error::{DatabaseError, NotelogError, Result};
 ///   to filter out non-note files like README.md or monthly rollups
 /// - Be less than 50 KiB in size
 pub async fn is_valid_note_file(path: &Path) -> bool {
-    // Check if it's a markdown file
     if path.extension().is_none_or(|ext| ext != "md") {
         return false;
     }
 
-    // Check if the filename starts with a date pattern
     if let Some(filename) = path.file_name() {
         let filename_str = filename.to_string_lossy();
-        // Only include files that start with '1' or '2' (for year 1xxx or 2xxx)
-        // This assumes the program won't be used for notes in the year 3000
+
         if !filename_str.starts_with('1') && !filename_str.starts_with('2') {
             return false;
         }
@@ -177,10 +174,8 @@ pub async fn process_note_file(
 
     // Insert or update the note in the database
     if let Some((id, _)) = &existing {
-        // Update existing note
         update_note(pool, id, &mtime_str, &metadata_json, note.content()).await?;
     } else {
-        // Insert new note
         insert_note(
             pool,
             &relative_path,
@@ -291,13 +286,12 @@ async fn collect_note_files_with_channel(
     // Process the current directory
     let mut entries = fs::read_dir(notes_dir).await?;
 
-    // First, collect all entries at this level
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         let metadata = fs::metadata(&path).await?;
 
         if metadata.is_dir() {
-            // Process subdirectories recursively using Box::pin to avoid infinite size
+            // Process subdirectories recursively
             Box::pin(collect_note_files_with_channel(&path, tx.clone())).await?;
             continue;
         }
