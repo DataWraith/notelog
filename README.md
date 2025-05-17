@@ -114,3 +114,14 @@ You can search for notes using fulltext search or by specific tags:
 - `How many notes tagged +todo do I have?`
 
 To avoid bloating the context window too much, a maximum of 25 notes with their IDs will be returned. The LLM can then use the IDs to retrieve the note contents on request.
+
+#### Editing Tags
+
+You can edit the tags of existing notes by asking the LLM:
+
+- `Add the tags +important and +project to note abc123`
+- `Remove the +draft tag from my note about databases`
+- `Change the tags on note def456 by adding +done and removing +todo`
+- `Update the tags for my note with ID ghi789 to include +reference but remove +draft`
+
+The LLM will use the note's ID (or search for it based on your description) to modify the tags while preserving the note's content.
