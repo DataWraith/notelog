@@ -25,7 +25,6 @@ use crate::core::note::Note;
 
 use crate::error::{DatabaseError, Result};
 
-/// The name of the SQLite database file
 const DB_FILENAME: &str = ".notes.db";
 
 /// Database connection pool
@@ -42,7 +41,6 @@ impl Database {
     ///
     /// This will create the database file if it doesn't exist and run migrations.
     pub async fn initialize(notes_dir: &Path) -> Result<Self> {
-        // Create the database path
         let db_path = notes_dir.join(DB_FILENAME);
         let db_url = format!("sqlite:{}", db_path.display());
 
@@ -53,7 +51,6 @@ impl Database {
                 .map_err(|e| DatabaseError::Connection(e.to_string()))?;
         }
 
-        // Connect to the database
         let pool = SqlitePool::connect(&db_url)
             .await
             .map_err(|e| DatabaseError::Connection(e.to_string()))?;
@@ -79,8 +76,6 @@ impl Database {
     /// Search for notes using fulltext search
     ///
     /// Returns a Vec of Notes that match the search query, ordered by relevance.
-    /// The results are returned in the exact order from the database query to maintain
-    /// the relevance-based ranking.
     ///
     /// # Parameters
     ///
@@ -103,12 +98,10 @@ impl Database {
             return Ok((Vec::new(), 0));
         }
 
-        // Check for non-overlapping date range
         if !is_valid_date_range(before.as_ref(), after.as_ref()) {
             return Ok((Vec::new(), 0));
         }
 
-        // Build the count query with parameter placeholders
         let base_count_query = String::from(
             r#"
             SELECT COUNT(*)
@@ -118,18 +111,15 @@ impl Database {
             "#,
         );
 
-        // Add date conditions to the count query if needed
         let count_query =
             add_date_conditions(base_count_query, before.as_ref(), after.as_ref(), true);
 
-        // Create a query builder for the count query
         let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query);
 
         // Process the query to handle tag prefixes (+ signs)
         // In FTS5, + is a special character, so we need to escape it or transform the query
         let processed_query = process_search_query(query);
 
-        // Bind the processed search query parameter
         count_query_builder = count_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
@@ -143,7 +133,6 @@ impl Database {
             count_query_builder = count_query_builder.bind(after_str);
         }
 
-        // Execute the count query
         let total_count = count_query_builder
             .fetch_one(&self.pool)
             .await
@@ -156,7 +145,7 @@ impl Database {
             }
         }
 
-        // Build the main query with parameter placeholders
+        // Build the main query
         let base_main_query = String::from(
             r#"
             SELECT
@@ -170,7 +159,6 @@ impl Database {
             "#,
         );
 
-        // Add date conditions to the main query if needed
         let mut main_query =
             add_date_conditions(base_main_query, before.as_ref(), after.as_ref(), true);
 
@@ -182,10 +170,9 @@ impl Database {
             main_query.push_str(&format!(" LIMIT {}", limit_val));
         }
 
-        // Create a query builder for the main query
         let mut main_query_builder = sqlx::query_as::<_, (i64, String, String, f64)>(&main_query);
 
-        // Bind the processed search query parameter (reuse the one we created earlier)
+        // Bind the processed search query parameter
         main_query_builder = main_query_builder.bind(&processed_query);
 
         // Bind date parameters if provided
@@ -250,7 +237,6 @@ impl Database {
         .await
         .map_err(|e| DatabaseError::Query(e.to_string()))?;
 
-        // This should always be Some since we checked the count above
         if let Some((metadata_json, content)) = note_data {
             // Convert JSON metadata and content to a Note
             let note = json_to_note(&metadata_json, &content)?;
@@ -311,13 +297,10 @@ impl Database {
     /// * `Ok(String)` - The shortest unique prefix of the ID (minimum 2 characters)
     /// * `Err` - If an error occurs or if the ID doesn't exist in the database
     pub async fn find_shortest_unique_id_prefix(&self, id: &crate::core::id::Id) -> Result<String> {
-        // Minimum prefix length is 2 characters
         const MIN_PREFIX_LENGTH: usize = 2;
 
-        // Get the string representation of the ID
         let id_str = id.as_str();
 
-        // Check if the full ID exists in the database
         let exists = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*)
