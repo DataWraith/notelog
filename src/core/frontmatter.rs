@@ -66,17 +66,6 @@ impl Frontmatter {
         self.tags.push(tag);
     }
 
-    /// Add multiple tags to the frontmatter
-    #[cfg(test)]
-    pub fn add_tags<I>(&mut self, tags: I)
-    where
-        I: IntoIterator<Item = Tag>,
-    {
-        for tag in tags {
-            self.add_tag(tag);
-        }
-    }
-
     /// Remove a tag from the frontmatter
     pub fn remove_tag(&mut self, tag: &Tag) -> bool {
         let initial_len = self.tags.len();
@@ -99,24 +88,6 @@ impl Frontmatter {
         for tag in tags_to_add {
             self.add_tag(tag);
         }
-    }
-
-    /// Create a new frontmatter with the same ID and timestamp but different tags
-    #[cfg(test)]
-    pub fn with_updated_tags<I, J>(&self, tags_to_add: I, tags_to_remove: J) -> Self
-    where
-        I: IntoIterator<Item = Tag>,
-        J: IntoIterator<Item = Tag>,
-    {
-        let mut new_frontmatter = self.clone();
-        new_frontmatter.update_tags(tags_to_add, tags_to_remove);
-        new_frontmatter
-    }
-
-    /// Apply frontmatter to content
-    #[cfg(test)]
-    pub fn apply_to_content(&self, content: &str) -> String {
-        format!("{}\n\n{}\n\n", self.to_yaml(), content)
     }
 
     /// Extract frontmatter from content if present
@@ -399,29 +370,6 @@ mod tests {
     }
 
     #[test]
-    fn test_frontmatter_apply_to_content() {
-        let date = Local.with_ymd_and_hms(2025, 4, 1, 12, 0, 0).unwrap();
-        let tag = Tag::new("test").unwrap();
-        let id = Id::new("0123456789abcdef").unwrap();
-
-        // Create a frontmatter with a specific ID for testing
-        let frontmatter = Frontmatter {
-            created: date.clone(),
-            tags: vec![tag.clone()],
-            id: Some(id.clone()),
-        };
-
-        let content = "# Test Content\nThis is a test.";
-        let result = frontmatter.apply_to_content(content);
-
-        // Id should appear first in the YAML
-        assert!(result.contains("---\nid: 0123456789abcdef\n"));
-        assert!(result.contains("created: 2025-04-01T12:00:00"));
-        assert!(result.contains("tags:\n  - test"));
-        assert!(result.contains("---\n\n# Test Content\nThis is a test.\n\n"));
-    }
-
-    #[test]
     fn test_frontmatter_extract_from_content() {
         // Valid frontmatter with tags
         let content = "---\ncreated: 2025-04-01T12:00:00+00:00\ntags:\n  - test\n---\n\n# Content";
@@ -515,25 +463,6 @@ mod tests {
     }
 
     #[test]
-    fn test_frontmatter_add_tags_method() {
-        let mut frontmatter = Frontmatter::default();
-        assert!(frontmatter.tags().is_empty());
-
-        // Add multiple tags
-        let tag1 = Tag::new("test").unwrap();
-        let tag2 = Tag::new("example").unwrap();
-        frontmatter.add_tags(vec![tag1.clone(), tag2.clone()]);
-
-        assert_eq!(frontmatter.tags().len(), 2);
-        assert_eq!(frontmatter.tags()[0].as_str(), "test");
-        assert_eq!(frontmatter.tags()[1].as_str(), "example");
-
-        // Add a duplicate tag (should be ignored)
-        frontmatter.add_tags(vec![tag1.clone()]);
-        assert_eq!(frontmatter.tags().len(), 2);
-    }
-
-    #[test]
     fn test_frontmatter_remove_tag_method() {
         let tag1 = Tag::new("test").unwrap();
         let tag2 = Tag::new("example").unwrap();
@@ -567,38 +496,5 @@ mod tests {
         assert!(!frontmatter.tags().iter().any(|t| t.as_str() == "test"));
         assert!(frontmatter.tags().iter().any(|t| t.as_str() == "example"));
         assert!(frontmatter.tags().iter().any(|t| t.as_str() == "new"));
-    }
-
-    #[test]
-    fn test_frontmatter_with_updated_tags_method() {
-        let tag1 = Tag::new("test").unwrap();
-        let tag2 = Tag::new("example").unwrap();
-        let frontmatter = Frontmatter::with_tags(vec![tag1.clone(), tag2.clone()]);
-
-        // Create a new frontmatter with updated tags
-        let tag3 = Tag::new("new").unwrap();
-        let new_frontmatter = frontmatter.with_updated_tags(vec![tag3.clone()], vec![tag1.clone()]);
-
-        // Original frontmatter should be unchanged
-        assert_eq!(frontmatter.tags().len(), 2);
-        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "test"));
-        assert!(frontmatter.tags().iter().any(|t| t.as_str() == "example"));
-
-        // New frontmatter should have updated tags
-        assert_eq!(new_frontmatter.tags().len(), 2);
-        assert!(!new_frontmatter.tags().iter().any(|t| t.as_str() == "test"));
-        assert!(
-            new_frontmatter
-                .tags()
-                .iter()
-                .any(|t| t.as_str() == "example")
-        );
-        assert!(new_frontmatter.tags().iter().any(|t| t.as_str() == "new"));
-
-        // IDs should be the same
-        assert_eq!(frontmatter.id(), new_frontmatter.id());
-
-        // Created timestamps should be the same
-        assert_eq!(frontmatter.created(), new_frontmatter.created());
     }
 }

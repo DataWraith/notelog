@@ -1,8 +1,6 @@
 //! NoteBuilder implementation for notelog
 
 use chrono::{DateTime, Local};
-#[cfg(test)]
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::core::frontmatter::Frontmatter;
@@ -48,7 +46,6 @@ impl NoteBuilder {
     }
 
     /// Set the frontmatter directly
-    #[cfg(test)]
     pub fn frontmatter(mut self, frontmatter: Frontmatter) -> Self {
         self.frontmatter = Some(frontmatter);
         self
@@ -70,7 +67,6 @@ impl NoteBuilder {
     }
 
     /// Set the creation timestamp
-    #[cfg(test)]
     pub fn created(mut self, created: DateTime<Local>) -> Self {
         self.created = Some(created);
         self
@@ -120,19 +116,6 @@ impl NoteBuilder {
         Ok(Note::new(frontmatter, self.content))
     }
 
-    /// Build and save the Note object
-    #[cfg(test)]
-    pub fn build_and_save(mut self, notes_dir: &Path) -> Result<PathBuf> {
-        // Extract the title override before consuming self
-        let title_override = self.title_override.take();
-
-        // Build the note
-        let note = self.build()?;
-
-        // Save the note with the title override
-        note.save(notes_dir, title_override.as_deref())
-    }
-
     /// Try to parse content as a note, falling back to creating a new note if parsing fails
     pub fn parse_or_create(self) -> Result<Note> {
         // Try to parse the content as a note
@@ -161,7 +144,6 @@ impl Default for NoteBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     #[test]
     fn test_note_builder_basic() {
@@ -275,40 +257,6 @@ mod tests {
                 .iter()
                 .any(|t| t.as_str() == "new")
         );
-    }
-
-    #[test]
-    fn test_note_builder_save() {
-        // Create a temporary directory for testing
-        let temp_dir = TempDir::new().unwrap();
-        let notes_dir = temp_dir.path();
-
-        let content = "# Test Save\nThis is a test of the save method.";
-        let result = NoteBuilder::new()
-            .content(content)
-            .build_and_save(notes_dir);
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_note_builder_save_with_title_override() {
-        // Create a temporary directory for testing
-        let temp_dir = TempDir::new().unwrap();
-        let notes_dir = temp_dir.path();
-
-        let content = "# Original Title\nThis is a test of the save method with title override.";
-        let result = NoteBuilder::new()
-            .content(content)
-            .title_override("Custom Title")
-            .build_and_save(notes_dir);
-
-        assert!(result.is_ok());
-
-        // Verify the file was created with the custom title in the filename
-        let path = result.unwrap();
-        let path_str = path.to_string_lossy();
-        assert!(path_str.contains("Custom Title"));
     }
 
     #[test]
