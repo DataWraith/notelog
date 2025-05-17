@@ -1,6 +1,7 @@
 //! NoteBuilder implementation for notelog
 
 use chrono::{DateTime, Local};
+#[cfg(test)]
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -47,6 +48,7 @@ impl NoteBuilder {
     }
 
     /// Set the frontmatter directly
+    #[cfg(test)]
     pub fn frontmatter(mut self, frontmatter: Frontmatter) -> Self {
         self.frontmatter = Some(frontmatter);
         self
@@ -68,6 +70,7 @@ impl NoteBuilder {
     }
 
     /// Set the creation timestamp
+    #[cfg(test)]
     pub fn created(mut self, created: DateTime<Local>) -> Self {
         self.created = Some(created);
         self
@@ -118,6 +121,7 @@ impl NoteBuilder {
     }
 
     /// Build and save the Note object
+    #[cfg(test)]
     pub fn build_and_save(mut self, notes_dir: &Path) -> Result<PathBuf> {
         // Extract the title override before consuming self
         let title_override = self.title_override.take();

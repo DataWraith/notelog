@@ -67,6 +67,7 @@ impl Frontmatter {
     }
 
     /// Add multiple tags to the frontmatter
+    #[cfg(test)]
     pub fn add_tags<I>(&mut self, tags: I)
     where
         I: IntoIterator<Item = Tag>,
@@ -101,6 +102,7 @@ impl Frontmatter {
     }
 
     /// Create a new frontmatter with the same ID and timestamp but different tags
+    #[cfg(test)]
     pub fn with_updated_tags<I, J>(&self, tags_to_add: I, tags_to_remove: J) -> Self
     where
         I: IntoIterator<Item = Tag>,
@@ -112,6 +114,7 @@ impl Frontmatter {
     }
 
     /// Apply frontmatter to content
+    #[cfg(test)]
     pub fn apply_to_content(&self, content: &str) -> String {
         format!("{}\n\n{}\n\n", self.to_yaml(), content)
     }
