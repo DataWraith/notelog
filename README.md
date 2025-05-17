@@ -1,11 +1,6 @@
 # Notelog
 
-**Status**: This is a prototype of a personal tool. Use at your own risk.
-
-
-Notelog is a command-line tool that you can use to record notes as you think of them -- thoughts, todos, insights, accomplishments, etc. It includes a *Model Context Protocol* (MCP) server for use by AI assistants.
-
-Notes are stored in a local directory as Markdown files with YAML frontmatter, organized by year and month.
+Notelog is a command-line tool that you can use to record notes as you think of them -- thoughts, todos, insights, accomplishments, etc. It includes a *Model Context Protocol* (MCP) server for use by AI assistants as primary mode of interaction.
 
 ## Installation
 
@@ -69,7 +64,7 @@ Notelog maintains an SQLite database in the specified notes directory for use as
 
 ### Model Context Protocol Server
 
-Notelog can act as a server that receives commands from AI assistants, allowing you to create or search notes using natural language (see examples below).
+Notelog can act as a server that receives commands from AI assistants, allowing you to create, (re-)tag  or search notes using natural language (see examples below).
 
 #### JSON Configuration Example
 
@@ -95,33 +90,29 @@ Notelog can act as a server that receives commands from AI assistants, allowing 
 
 #### Creating Notes
 
-You can create notes by just asking the LLM:
+You can create notes by asking the LLM:
 
 - `/log Added Model Context Protocol support to Notelog +mcp +done`
 - `Create a note: "Use this text verbatim in the note"`
 - `Summarize the conversation so far as a notelog`
-- `Create a note about Topic X. Show me a preview before saving.`
 
-The default prompt instructs the LLM to automatically add tags and a title to the notes if you don't specify them.
+The default prompt instructs the LLM to automatically add tags and a title to the notes as appropriate.
 
 #### Searching for Notes
 
 You can search for notes using fulltext search or by specific tags:
 
 - `Find notes containing "project plan" with tag +important`
-- `Look for notes mentioning databases from April 2025`
 - `Search for notes tagged +sqlite and +til from May 2025`
 - `How many notes tagged +todo do I have?`
 
-To avoid bloating the context window too much, a maximum of 25 notes with their IDs will be returned. The LLM can then use the IDs to retrieve the note contents on request.
+To avoid bloating the context window too much, a maximum of 25 notes with their IDs will be returned. The LLM can then use the IDs to retrieve the note contents or edit its tags on request.
 
 #### Editing Tags
 
 You can edit the tags of existing notes by asking the LLM:
 
-- `Add the tags +important and +project to note abc123`
-- `Remove the +draft tag from my note about databases`
-- `Change the tags on note def456 by adding +done and removing +todo`
-- `Update the tags for my note with ID ghi789 to include +reference but remove +draft`
+- `Remove the +draft tag from note abc123 and add +todo`
+- `Mark note def456 as done` (this should remove the +todo tag and add the +done tag)
 
-The LLM will use the note's ID (or search for it based on your description) to modify the tags while preserving the note's content.
+The note IDs can be found by searching for notes as detailed above.
