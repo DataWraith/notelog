@@ -59,6 +59,9 @@ pub enum DatabaseError {
 
     #[error("Multiple notes found with ID prefix '{0}': {1} matches")]
     MultipleMatches(String, usize),
+
+    #[error("Invalid search query: {0}")]
+    InvalidSearchQuery(String),
 }
 
 #[derive(Error, Debug)]
@@ -96,7 +99,9 @@ pub enum NotelogError {
     #[error("Invalid options for 'mcp' command: only the global --notes-dir option is allowed.")]
     InvalidMcpOptions,
 
-    #[error("Invalid options for 'last' command: only the global --notes-dir and --print options are allowed.")]
+    #[error(
+        "Invalid options for 'last' command: only the global --notes-dir and --print options are allowed."
+    )]
     InvalidLastOptions,
 
     #[error("No valid note found")]
