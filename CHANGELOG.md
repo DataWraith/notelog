@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- scriv-insert-here -->
 
+<a id='changelog-0.7.0'></a>
+# 0.7.0 — 2025-05-19
+
+## Added
+
+- `last` subcommand that can open or print the newest note
+
+## Changed
+
+- Improved handling of search queries in the MCP server
+
 <a id='changelog-0.6.1'></a>
 # 0.6.1 — 2025-05-17
 
