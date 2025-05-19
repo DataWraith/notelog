@@ -11,6 +11,49 @@ use tempfile::NamedTempFile;
 use crate::constants::MAX_FILE_SIZE_BYTES;
 use crate::error::{NotelogError, Result};
 
+/// Check if a file path is a valid note file
+///
+/// A valid note file must:
+/// - Have a .md extension
+/// - Have a filename that starts with '1' or '2' (for year 1xxx or 2xxx)
+///   to filter out non-note files like README.md or monthly rollups
+/// - Be less than MAX_FILE_SIZE_BYTES in size
+pub fn is_valid_note_file(path: &Path) -> Result<bool> {
+    // Check if it's a markdown file
+    if let Some(ext) = path.extension() {
+        if ext != "md" {
+            return Ok(false);
+        }
+    } else {
+        return Ok(false);
+    }
+
+    // Check if the filename starts with a date pattern
+    if let Some(filename) = path.file_name() {
+        let filename_str = filename.to_string_lossy();
+        // Only include files that start with '1' or '2' (for year 1xxx or 2xxx)
+        // This assumes the program won't be used for notes in the year 3000
+        if !filename_str.starts_with('1') && !filename_str.starts_with('2') {
+            return Ok(false);
+        }
+    } else {
+        return Ok(false);
+    }
+
+    // Check file size (must be less than MAX_FILE_SIZE_BYTES)
+    if let Ok(metadata) = fs::metadata(path) {
+        let file_size = metadata.len();
+        if file_size > MAX_FILE_SIZE_BYTES as u64 {
+            return Ok(false);
+        }
+    } else {
+        // If we can't get the metadata, consider it invalid
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
 /// Determine the notes directory from the provided path, environment variable, or default
 pub fn get_notes_dir(notes_dir: Option<PathBuf>) -> Result<PathBuf> {
     notes_dir
@@ -267,5 +310,27 @@ mod tests {
         let result = String::from_utf8(invalid_utf8).map_err(|_| NotelogError::InvalidUtf8Content);
 
         assert!(matches!(result, Err(NotelogError::InvalidUtf8Content)));
+    }
+
+    #[test]
+    fn test_is_valid_note_file() {
+        // Valid note file (assuming it exists and is small enough)
+        // This would be a valid note file if it existed
+        let _path = PathBuf::from("2023-01-01T12-00 Test Note.md");
+
+        // This will return false because the file doesn't exist, but we can test the logic
+        // by checking the code paths
+
+        // Invalid extension
+        let path = PathBuf::from("2023-01-01T12-00 Test Note.txt");
+        assert!(!is_valid_note_file(&path).unwrap_or(true));
+
+        // Invalid filename (doesn't start with 1 or 2)
+        let path = PathBuf::from("3023-01-01T12-00 Test Note.md");
+        assert!(!is_valid_note_file(&path).unwrap_or(true));
+
+        // No extension
+        let path = PathBuf::from("2023-01-01T12-00 Test Note");
+        assert!(!is_valid_note_file(&path).unwrap_or(true));
     }
 }

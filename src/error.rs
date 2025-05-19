@@ -96,6 +96,12 @@ pub enum NotelogError {
     #[error("Invalid options for 'mcp' command: only the global --notes-dir option is allowed.")]
     InvalidMcpOptions,
 
+    #[error("Invalid options for 'last' command: only the global --notes-dir and --print options are allowed.")]
+    InvalidLastOptions,
+
+    #[error("No valid note found")]
+    NoValidNoteFound,
+
     #[error("MCP server error: {0}")]
     McpServerError(String),
 

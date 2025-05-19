@@ -45,6 +45,7 @@ fn run() -> Result<()> {
             commands::add_note(&notes_dir, args, stdin_content).map(|_| ())
         }
         Some(Commands::Mcp(args)) => commands::mcp_command(&notes_dir, args),
+        Some(Commands::Last(args)) => commands::last_note(&notes_dir, args),
         None => {
             // If no subcommand is provided, treat trailing args as 'add' command
             let add_args = AddArgs {

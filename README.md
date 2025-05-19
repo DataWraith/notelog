@@ -16,6 +16,9 @@ To install from source:
 ### Basic Usage
 
 ```bash
+# Opens an editor to capture a note
+notelog
+
 # Add a note with content from command line arguments
 notelog add "This is a note" +example-tag
 
@@ -34,8 +37,11 @@ echo "Lorem ipsum" | notelog
 # Add a note with a specific notes directory
 notelog -d ~/Shanties add -t "Wellerman" There once was a ship
 
-# Opens an editor to capture a note
-notelog
+# Opens the most recent note in the editor
+notelog last
+
+# Prints the most recent note to stdout
+notelog last --print
 ```
 
 ### Notes Directory

@@ -32,6 +32,8 @@ pub enum Commands {
     Add(AddArgs),
     /// Starts the Model Context Protocol server
     Mcp(McpArgs),
+    /// Find and open the newest note
+    Last(LastArgs),
 }
 
 #[derive(Args)]
@@ -62,6 +64,27 @@ pub struct McpArgs {
     pub file: Option<PathBuf>,
 
     /// Arguments (should not be used with mcp)
+    #[arg(trailing_var_arg = true, hide = true)]
+    pub args: Vec<String>,
+}
+
+/// Arguments for the last command
+#[derive(Args)]
+pub struct LastArgs {
+    /// Print the note content instead of opening it in the editor
+    #[arg(short = 'p', long = "print")]
+    pub print: bool,
+
+    // We need to capture global options to check if they were provided
+    /// Title of the note (should not be used with last)
+    #[arg(short = 't', long = "title", hide = true)]
+    pub title: Option<String>,
+
+    /// File to read note content from (should not be used with last)
+    #[arg(short = 'f', long = "file", hide = true)]
+    pub file: Option<PathBuf>,
+
+    /// Arguments (should not be used with last)
     #[arg(trailing_var_arg = true, hide = true)]
     pub args: Vec<String>,
 }

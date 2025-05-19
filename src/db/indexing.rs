@@ -6,45 +6,19 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio::fs;
 
-use crate::constants::MAX_FILE_SIZE_BYTES;
-
 use crate::core::note::Note;
 use crate::error::{DatabaseError, NotelogError, Result};
+use crate::utils;
 
-/// Check if a file path is a valid note file
+/// Async version of is_valid_note_file
 ///
 /// A valid note file must:
 /// - Have a .md extension
 /// - Have a filename that starts with '1' or '2' (for year 1xxx or 2xxx)
 ///   to filter out non-note files like README.md or monthly rollups
-/// - Be less than 50 KiB in size
+/// - Be less than MAX_FILE_SIZE_BYTES in size
 pub async fn is_valid_note_file(path: &Path) -> bool {
-    if path.extension().is_none_or(|ext| ext != "md") {
-        return false;
-    }
-
-    if let Some(filename) = path.file_name() {
-        let filename_str = filename.to_string_lossy();
-
-        if !filename_str.starts_with('1') && !filename_str.starts_with('2') {
-            return false;
-        }
-    } else {
-        return false;
-    }
-
-    // Check file size (must be less than MAX_FILE_SIZE_BYTES)
-    if let Ok(metadata) = fs::metadata(path).await {
-        let file_size = metadata.len();
-        if file_size > MAX_FILE_SIZE_BYTES as u64 {
-            return false;
-        }
-    } else {
-        // If we can't get the metadata, consider it invalid
-        return false;
-    }
-
-    true
+    utils::is_valid_note_file(path).unwrap_or(false)
 }
 
 /// Get all note filepaths from the database
