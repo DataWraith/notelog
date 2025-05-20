@@ -1,5 +1,7 @@
-default:
-    @echo "Use \`release-build\`."
+default: test
+
+test:
+    cargo nextest run
 
 release-build version:
     rm -f ./dist/*
