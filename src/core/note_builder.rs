@@ -95,17 +95,15 @@ impl NoteBuilder {
 
         // Create the frontmatter
         let frontmatter = match self.frontmatter {
-            Some(fm) => {
+            Some(mut fm) => {
                 // If we have frontmatter but also have tags, add them to the frontmatter
                 if !self.tags.is_empty() {
-                    let mut fm_clone = fm.clone();
                     for tag in self.tags {
-                        fm_clone.add_tag(tag);
+                        fm.add_tag(tag);
                     }
-                    fm_clone
-                } else {
-                    fm
                 }
+
+                fm
             }
             None => {
                 // Create new frontmatter with the provided tags and timestamp
@@ -114,7 +112,6 @@ impl NoteBuilder {
             }
         };
 
-        // Create the note
         Ok(Note::new(frontmatter, self.content))
     }
 
