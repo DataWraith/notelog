@@ -54,7 +54,6 @@ impl Id {
             })
             .collect();
 
-        // This should never fail since we're generating a valid ID
         Id(id)
     }
 
