@@ -1,3 +1,4 @@
+use std::collections::BinaryHeap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -14,7 +15,7 @@ pub fn last_note(notes_dir: &Path, args: LastArgs) -> Result<()> {
         return Err(NotelogError::InvalidLastOptions);
     }
 
-    // Find the newest note
+    // Find the newest note.
     let newest_note_path = find_newest_note(notes_dir)?;
 
     // Either print the note or open it in the editor
@@ -43,31 +44,23 @@ pub fn last_note(notes_dir: &Path, args: LastArgs) -> Result<()> {
 }
 
 /// Find the newest note in the notes directory
+///
+/// Searches for the last year in the notes directory, then the last month in
+/// that directory, and then the last note in that directory. Usually it should
+/// return quickly, because it does not descend deeper into the tree than
+/// necessary.
 fn find_newest_note(notes_dir: &Path) -> Result<PathBuf> {
-    // Get all year directories
-    let year_dirs = get_sorted_year_dirs(notes_dir)?;
-    if year_dirs.is_empty() {
-        return Err(NotelogError::NoValidNoteFound);
-    }
+    let mut year_dirs = get_year_dirs(notes_dir)?;
 
-    // Start from the newest year (last in the sorted list)
-    for year_dir in year_dirs.iter().rev() {
-        // Get all month directories for this year
-        let month_dirs = get_sorted_month_dirs(year_dir)?;
-        if month_dirs.is_empty() {
-            continue;
-        }
+    while let Some(year_dir) = year_dirs.pop() {
+        let mut month_dirs = get_month_dirs(&year_dir)?;
 
-        // Start from the newest month (last in the sorted list)
-        for month_dir in month_dirs.iter().rev() {
-            // Get all note files in this month
-            let note_files = get_sorted_note_files(month_dir)?;
-            if note_files.is_empty() {
-                continue;
+        while let Some(month_dir) = month_dirs.pop() {
+            let note_file = get_last_note_file(&month_dir)?;
+
+            if note_file.is_some() {
+                return Ok(note_file.unwrap());
             }
-
-            // Return the newest note (last in the sorted list)
-            return Ok(note_files.last().unwrap().clone());
         }
     }
 
@@ -76,8 +69,8 @@ fn find_newest_note(notes_dir: &Path) -> Result<PathBuf> {
 }
 
 /// Get all year directories sorted by name
-fn get_sorted_year_dirs(notes_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut year_dirs = Vec::new();
+fn get_year_dirs(notes_dir: &Path) -> Result<BinaryHeap<PathBuf>> {
+    let mut year_dirs = BinaryHeap::new();
 
     // Read the notes directory
     let entries = fs::read_dir(notes_dir)?;
@@ -96,15 +89,12 @@ fn get_sorted_year_dirs(notes_dir: &Path) -> Result<Vec<PathBuf>> {
         }
     }
 
-    // Sort the directories by name
-    year_dirs.sort();
-
     Ok(year_dirs)
 }
 
 /// Get all month directories sorted by name
-fn get_sorted_month_dirs(year_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut month_dirs = Vec::new();
+fn get_month_dirs(year_dir: &Path) -> Result<BinaryHeap<PathBuf>> {
+    let mut month_dirs = BinaryHeap::new();
 
     // Read the year directory
     let entries = fs::read_dir(year_dir)?;
@@ -128,15 +118,13 @@ fn get_sorted_month_dirs(year_dir: &Path) -> Result<Vec<PathBuf>> {
         }
     }
 
-    // Sort the directories by name
-    month_dirs.sort();
-
     Ok(month_dirs)
 }
 
-/// Get all note files sorted by name
-fn get_sorted_note_files(month_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut note_files = Vec::new();
+/// Get the note file with the largest path (which should be the newest one,
+/// since note paths include the date and time)
+fn get_last_note_file(month_dir: &Path) -> Result<Option<PathBuf>> {
+    let mut note_file = None;
 
     // Read the month directory
     let entries = fs::read_dir(month_dir)?;
@@ -147,13 +135,10 @@ fn get_sorted_note_files(month_dir: &Path) -> Result<Vec<PathBuf>> {
         if path.is_file() {
             // Use the utility function to check if it's a valid note file
             if is_valid_note_file(&path)? {
-                note_files.push(path);
+                note_file = note_file.max(Some(path));
             }
         }
     }
 
-    // Sort the files by name
-    note_files.sort();
-
-    Ok(note_files)
+    Ok(note_file)
 }
