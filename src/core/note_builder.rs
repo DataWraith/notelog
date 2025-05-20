@@ -97,10 +97,8 @@ impl NoteBuilder {
         let frontmatter = match self.frontmatter {
             Some(mut fm) => {
                 // If we have frontmatter but also have tags, add them to the frontmatter
-                if !self.tags.is_empty() {
-                    for tag in self.tags {
-                        fm.add_tag(tag);
-                    }
+                for tag in self.tags {
+                    fm.add_tag(tag);
                 }
 
                 fm
