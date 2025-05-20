@@ -119,7 +119,7 @@ impl Frontmatter {
         let created_yaml = self.created.format("created: %Y-%m-%dT%H:%M:%S%:z\n");
 
         let tags_yaml = if !self.tags.is_empty() {
-            let mut yaml = String::from("\ntags:");
+            let mut yaml = String::from("tags:");
             for tag in &self.tags {
                 yaml.push_str(&format!("\n  - {}", tag));
             }
