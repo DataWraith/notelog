@@ -40,12 +40,14 @@ impl NoteBuilder {
     }
 
     /// Set the creation timestamp
+    #[cfg(test)]
     pub fn created(mut self, created: DateTime<Local>) -> Self {
         self.created = Some(created);
         self
     }
 
     /// Set the frontmatter directly
+    #[cfg(test)]
     pub fn frontmatter(mut self, frontmatter: Frontmatter) -> Self {
         self.frontmatter = Some(frontmatter);
         self
