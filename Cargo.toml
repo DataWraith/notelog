@@ -20,4 +20,4 @@ serde_yaml = "0.9.34"
 sqlx = { version = "0.8.5", features = ["derive", "sqlite", "runtime-tokio", "migrate"] }
 tempfile = "3.19.1"
 thiserror = "2.0.12"
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
