@@ -1,5 +1,7 @@
 # Notelog
 
+**Status**: Abandoned.
+
 Notelog is a command-line tool that you can use to record notes as you think of them -- thoughts, todos, insights, accomplishments, etc. It includes a *Model Context Protocol* (MCP) server for use by AI assistants as primary mode of interaction.
 
 ## Installation
